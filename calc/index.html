@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quantum Physics Multimeter</title>
+    <style>
+        :root {
+            --bg: #0b0e14;
+            --panel: #1c2128;
+            --accent: #58a6ff;
+            --danger: #f85149;
+            --success: #3fb950;
+            --text: #c9d1d9;
+        }
+
+        body {
+            background-color: var(--bg);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        .calc-container {
+            background: var(--panel);
+            padding: 30px;
+            border-radius: 24px;
+            box-shadow: 0 0 40px rgba(0,0,0,0.8), inset 0 0 2px rgba(255,255,255,0.1);
+            border: 1px solid #30363d;
+            width: 360px;
+            position: relative;
+        }
+
+        /* Physics Branding */
+        .brand {
+            color: #8b949e;
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 15px;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .display-area {
+            background: #010409;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 25px;
+            border: 1px solid var(--accent);
+            box-shadow: 0 0 15px rgba(88, 166, 255, 0.1);
+            text-align: right;
+            min-height: 90px;
+        }
+
+        #history {
+            color: #484f58;
+            font-size: 0.85rem;
+            height: 1.2rem;
+            font-family: 'Courier New', monospace;
+        }
+
+        #main-display {
+            color: var(--accent);
+            font-size: 2rem;
+            font-family: 'Courier New', monospace;
+            margin-top: 5px;
+            overflow: hidden;
+            white-space: nowrap;
+        }
+
+        .button-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px;
+        }
+
+        button {
+            padding: 18px 10px;
+            border: none;
+            border-radius: 10px;
+            background: #2d333b;
+            color: var(--text);
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            border-bottom: 3px solid #1c2128;
+        }
+
+        button:hover {
+            background: #444c56;
+            transform: translateY(-2px);
+            border-bottom-width: 5px;
+        }
+
+        button:active {
+            transform: translateY(2px);
+            border-bottom-width: 1px;
+        }
+
+        /* Specialized Buttons */
+        .const { 
+            color: var(--success); 
+            font-style: italic; 
+            font-family: "Times New Roman", Times, serif;
+            font-size: 1.2rem;
+        }
+        
+        .op { color: #ffab70; }
+        
+        .reset { 
+            grid-column: span 2; 
+            background: #3e1c1c; 
+            color: #ff7b72; 
+        }
+
+        .equal-btn {
+            grid-column: span 2;
+            background: var(--accent);
+            color: white;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .equal-btn:hover { background: #79c0ff; }
+
+        /* Status bar */
+        .status-light {
+            width: 8px;
+            height: 8px;
+            background: var(--success);
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 5px;
+            box-shadow: 0 0 5px var(--success);
+        }
+    </style>
+</head>
+<body>
+
+    <div class="calc-container">
+        <div class="brand">
+            <span><span class="status-light"></span> System Ready</span>
+            <span>v4.02-Quantum</span>
+        </div>
+
+        <div class="display-area">
+            <div id="history"></div>
+            <div id="main-display">0</div>
+        </div>
+
+        <div class="button-grid">
+            <button class="const" title="Speed of Light" onclick="add('299792458')">c</button>
+            <button class="const" title="Gravitational Const" onclick="add('6.67e-11')">G</button>
+            <button class="const" title="Planck Const" onclick="add('6.62e-34')">h</button>
+            <button class="op" onclick="add('/')">÷</button>
+
+            <button onclick="add('7')">7</button>
+            <button onclick="add('8')">8</button>
+            <button onclick="add('9')">9</button>
+            <button class="op" onclick="add('*')">×</button>
+
+            <button onclick="add('4')">4</button>
+            <button onclick="add('5')">5</button>
+            <button onclick="add('6')">6</button>
+            <button class="op" onclick="add('-')">-</button>
+
+            <button onclick="add('1')">1</button>
+            <button onclick="add('2')">2</button>
+            <button onclick="add('3')">3</button>
+            <button class="op" onclick="add('+')">+</button>
+
+            <button onclick="add('0')">0</button>
+            <button onclick="add('.')">.</button>
+            <button class="reset" onclick="reset()">SYSTEM RESET</button>
+
+            <button class="equal-btn" onclick="process()">Compute Result</button>
+            <button class="const" title="Boltzmann Const" onclick="add('1.38e-23')">k</button>
+            <button class="const" title="Atmospheric Pressure" onclick="add('101325')">P₀</button>
+        </div>
+    </div>
+
+    <script>
+        let input = "";
+        const mainDisplay = document.getElementById('main-display');
+        const historyDisplay = document.getElementById('history');
+
+        function add(val) {
+            if(mainDisplay.innerText === "Solve Yourself") {
+                reset();
+            }
+            input += val;
+            mainDisplay.innerText = input;
+            mainDisplay.style.color = "var(--accent)";
+        }
+
+        function reset() {
+            input = "";
+            mainDisplay.innerText = "0";
+            historyDisplay.innerText = "";
+            mainDisplay.style.color = "var(--accent)";
+        }
+
+        function process() {
+            if (!input) return;
+
+            historyDisplay.innerText = input + " =";
+            mainDisplay.innerText = "ANALYZING...";
+            mainDisplay.style.color = "#e3b341";
+
+            // Fake delay for dramatic effect
+            setTimeout(() => {
+                mainDisplay.innerText = "Padh le bkl";
+                mainDisplay.style.color = "var(--danger)";
+                input = ""; // Clear memory
+            }, 800);
+        }
+    </script>
+</body>
+  </html>
+  
