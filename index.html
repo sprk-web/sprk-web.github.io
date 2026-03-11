@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shashank Pathak | Portfolio</title>
+    <script src="https://unpkg.com/scrollreveal"></script>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --card-bg: rgba(30, 41, 59, 0.7);
+            --accent: #38bdf8;
+            --text: #f1f5f9;
+            --text-dim: #94a3b8;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        /* Hero Section */
+        .hero {
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            background: radial-gradient(circle at center, #1e293b 0%, #0f172a 100%);
+        }
+
+        h1 { font-size: 4rem; margin-bottom: 10px; letter-spacing: -1px; }
+        .highlight { color: var(--accent); }
+        .tagline { font-size: 1.2rem; color: var(--text-dim); max-width: 600px; }
+
+        /* Sections */
+        .container { max-width: 1000px; margin: 0 auto; padding: 80px 20px; }
+        h2 { font-size: 2rem; margin-bottom: 40px; border-left: 4px solid var(--accent); padding-left: 15px; }
+
+        /* Project Cards */
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 25px; }
+        
+        .card {
+            background: var(--card-bg);
+            padding: 30px;
+            border-radius: 15px;
+            border: 1px solid rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            transition: transform 0.3s ease, border-color 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-10px);
+            border-color: var(--accent);
+            box-shadow: 0 10px 30px rgba(56, 189, 248, 0.1);
+        }
+
+        .status { font-size: 0.8rem; color: var(--accent); font-weight: bold; text-transform: uppercase; }
+
+        /* Skills/Education */
+        .info-box { margin-top:20px; margin-bottom: 20px; padding: 20px; border-radius: 10px; background: rgba(255,255,255,0.03); }
+        
+        footer { text-align: center; padding: 40px; color: var(--text-dim); font-size: 0.9rem; }
+    </style>
+</head>
+<body>
+
+    <section class="hero">
+        <h1 class="reveal">Shashank <span class="highlight">Pathak</span></h1>
+        <p class="tagline reveal">Architecting Logic through Data & Code. <br> Mathematics Enthusiast | App Developer | Data Science Student</p>
+    </section>
+
+    <div class="container">
+        <section id="about">
+            <h2 class="reveal">Education</h2>
+            <div class="info-box reveal">
+                <h3>MK DAV Public School, Daltonganj</h3>
+                <p>Focusing on Mathematics and Computer Science applications.</p>
+            </div>
+        </section>
+
+        <section id="projects">
+            <h2 class="reveal">Featured Projects</h2>
+            <div class="grid">
+                <div class="card reveal">
+                    <span class="status">In Progress</span>
+                    <h3>Stuco</h3>
+                    <p>A Flet-based application using advanced algorithms to analyze study patterns and eliminate distractions.</p>
+                </div>
+                <div class="card reveal">
+                    <span class="status">Completed</span>
+                    <h3>Sangeet</h3>
+                    <p>High-performance Kivy mobile app for seamless local MP3 streaming with a modern UI.</p>
+                </div>
+                <div class="card reveal">
+                    <span class="status">Completed</span>
+                    <h3>Diary</h3>
+                    <p>A secure, MD-style journaling app built with KivyMD for cross-platform daily reflections.</p>
+                </div>
+            </div>
+        </section>
+
+        <section id="skills">
+            <h2 class="reveal">Core Skills</h2>
+            <div class="grid">
+                <div class="info-box reveal">
+                    <h3>Programming</h3>
+                    <p>App Development (Flet, Kivy, KivyMD), Python, Algorithm Design.</p>
+                </div>
+                <div class="info-box reveal">
+                    <h3>Strategic Thinking</h3>
+                    <p>Advanced Chess Player & Mathematics solver.</p>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <footer>
+        &copy; 2026 Shashank Pathak. Built with Logic.
+    </footer>
+
+    <script>
+        ScrollReveal().reveal('.reveal', {
+            delay: 200,
+            distance: '50px',
+            origin: 'bottom',
+            duration: 1000,
+            interval: 100
+        });
+    </script>
+</body>
+</html>
