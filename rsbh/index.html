@@ -65,7 +65,7 @@
             border: 5px solid var(--bg-dark); z-index: 2;
         }
         .avatar-container img { width: 100%; height: 100%; object-fit: cover; }
-        
+
         @keyframes rotate { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
         h1 { font-size: 3.2rem; font-weight: 800; letter-spacing: -1.5px; margin-bottom: 10px; }
@@ -136,25 +136,24 @@
     </div>
 
     <div class="container">
-        <header class="hero-card" data-aos="fade-down">
+        <header class="hero-card" data-aos="zoom-in">
             <div class="avatar-wrapper">
                 <div class="avatar-ring"></div>
                 <div class="avatar-container">
-                    <img src="https://sprk-web.github.io/images/pfp.jpg" alt="Rishabh Verma">
+                    <img src="https://sprk-web.github.io/images/pfp2.jpg" alt="Rishabh Verma">
                 </div>
             </div>
             <h1>Rishabh Verma</h1>
             <div class="school-tag">
-                <i class="fas fa-award"></i> 
-                Senior Faculty at Gyan Niketan Balika Vidyalaya
+                <i class="fas fa-university"></i> 
+                Senior Faculty @ Gyan Niketan Balika Vidyalaya
             </div>
-            <p style="color: var(--text-dim); max-width: 650px; margin: 0 auto 30px;">
-                Expert in English Literature, Science, and Mathematics. Shaping the future of Daltonganj through innovative, inquiry-based education.
+            <p style="color: var(--text-dim); max-width: 600px; margin: 0 auto 30px;">
+                Specializing in English Literature, Science, and Mathematics. Dedicated to fostering critical thinking and academic excellence in Daltonganj.
             </p>
-            <div style="display: flex; gap: 15px; justify-content: center; flex-wrap: wrap;">
-                <a href="mailto:rishabhk0000@gmail.com" class="call-btn" style="margin-top:0; font-size: 1rem; padding: 15px 30px;">
-                    <i class="fas fa-envelope"></i> Email Me
-                </a>
+            <div class="cta-group">
+                <a href="mailto:rishabhk0000@gmail.com" class="btn btn-primary">Get in Touch</a>
+                <a href="#coaching" class="btn btn-outline">View Coaching</a>
             </div>
         </header>
 
@@ -179,10 +178,11 @@
         </div>
         <div class="swiper mySwiper" data-aos="zoom-in">
             <div class="swiper-wrapper">
-                <div class="swiper-slide"><img src="https://images.unsplash.com/photo-1524178232363-1fb2b075b655?auto=format&fit=crop&q=80&w=400" alt="Teaching"></div>
-                <div class="swiper-slide"><img src="https://images.unsplash.com/photo-1544531585-9847b68c8c86?auto=format&fit=crop&q=80&w=400" alt="Students"></div>
-                <div class="swiper-slide"><img src="https://images.unsplash.com/photo-1509062522246-3755977927d7?auto=format&fit=crop&q=80&w=400" alt="Classroom"></div>
-                <div class="swiper-slide"><img src="https://images.unsplash.com/photo-1427504494785-3a9ca7044f45?auto=format&fit=crop&q=80&w=400" alt="Lecture"></div>
+                <div class="swiper-slide"><img src="https://sprk-web.github.io/images/c1.jpg" alt="Teaching"></div>
+                <div class="swiper-slide"><img src="https://sprk-web.github.io/images/c2.jpg" alt="Students"></div>
+                <div class="swiper-slide"><img src="https://sprk-web.github.io/images/c3.jpg" alt="Classroom"></div>
+                <div class="swiper-slide"><img src="https://sprk-web.github.io/images/c4.jpg" alt="Lecture"></div>
+                <div class="swiper-slide"><img src="https://sprk-web.github.io/images/c5.jpg" alt="Lecture"></div>
             </div>
             <div class="swiper-pagination"></div>
         </div>
@@ -220,7 +220,7 @@
             <div style="background: var(--primary-accent); color: #000; padding: 5px 20px; border-radius: 50px; display: inline-block; font-weight: bold; margin-bottom: 20px;">Limited Seats Available</div>
             <h2 style="font-size: 2.5rem; margin-bottom: 10px;">Bright Up Coaching Centre</h2>
             <p style="font-size: 1.2rem; margin-bottom: 25px;">"Igniting Minds, Shaping Futures."</p>
-            
+
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 20px; margin: 30px 0;">
                 <div><i class="fas fa-user-friends" style="color: var(--primary-accent)"></i><br>Classes 6 - 10</div>
                 <div><i class="fas fa-clock" style="color: var(--primary-accent)"></i><br>3:30 PM - 7:30 PM</div>
@@ -232,10 +232,23 @@
             </a>
         </section>
 
-        <div class="testimonial-slider" data-aos="fade-up">
-            <div class="t-item active">
-                <p class="t-quote">"A creative and visionary teacher with excellent communication skills. Mr. Rishabh doesn't just teach books; he teaches us how to see the world."</p>
-                <p><strong>Mrs. Sunita Sharma</strong> — Principal</p>
+        <div class="section-title" data-aos="fade-right">Voices of Impact</div>
+        <div class="testimonial-carousel" data-aos="fade-up">
+            <div class="testimonial-item active">
+                <p class="testimonial-quote">"A creative and visionary teacher with excellent communication skills."</p>
+                <p class="testimonial-author">Mrs. Sunita Sharma — Principal</p>
+            </div>
+            <div class="testimonial-item">
+                <p class="testimonial-quote">"Mr. Rishabh doesn't just teach books; he teaches us how to see the world through different eyes."</p>
+                <p class="testimonial-author">Ribha Gupta — Former Student</p>
+            </div>
+            <div class="testimonial-item">
+                <p class="testimonial-quote">"A visionary educator who seamlessly integrates technology into English Literature."</p>
+                <p class="testimonial-author">Shashank Pathak — Student</p>
+            </div>
+            <div class="testimonial-nav">
+                <button onclick="moveTestimonial(-1)"><i class="fas fa-chevron-left"></i></button>
+                <button onclick="moveTestimonial(1)"><i class="fas fa-chevron-right"></i></button>
             </div>
         </div>
 
@@ -270,6 +283,20 @@
             autoplay: { delay: 2500, disableOnInteraction: false },
             pagination: { el: ".swiper-pagination" },
         });
+        
+        // Testimonial Logic
+        let currentIdx = 0;
+        const items = document.querySelectorAll('.testimonial-item');
+        function moveTestimonial(dir) {
+            items[currentIdx].classList.remove('active');
+            currentIdx = (currentIdx + dir + items.length) % items.length;
+            items[currentIdx].classList.add('active');
+        }
+
+        function setTheme(color) {
+            document.documentElement.style.setProperty('--primary-accent', color);
+            localStorage.setItem('pref-color', color);
+        }
 
         // Theme Functionality
         function setTheme(color) {
