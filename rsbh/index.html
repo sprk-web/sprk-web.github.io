@@ -35,11 +35,20 @@
 
         /* --- Theme Picker --- */
         .theme-panel {
-            position: fixed; top: 20px; right: 20px; background: var(--card-bg);
-            padding: 10px; border-radius: 50px; display: flex; gap: 8px; z-index: 1000;
-            border: 1px solid var(--glass-border); backdrop-filter: blur(15px);
-        }
-        .color-dot { width: 20px; height: 20px; border-radius: 50%; cursor: pointer; transition: 0.3s; border: 2px solid rgba(0,0,0,0.2); }
+    position: fixed; 
+    top: 20px; 
+    right: 20px; 
+    background: var(--card-bg);
+    padding: 8px 12px; /* Adjusted padding */
+    border-radius: 50px; 
+    display: flex; 
+    gap: 10px; 
+    z-index: 1000;
+    border: 1px solid var(--glass-border); 
+    backdrop-filter: blur(15px);
+    -webkit-backdrop-filter: blur(15px); /* Safari support */
+    box-sizing: border-box;
+}
 
         /* --- Hero Section --- */
         .hero-card {
