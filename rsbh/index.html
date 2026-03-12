@@ -134,13 +134,16 @@
             h1 { font-size: 2.4rem; }
             .coaching-card { padding: 30px 20px; }
         }
-        
+
         /* --- Utilities --- */
         .btn { padding: 12px 30px; border-radius: 15px; text-decoration: none; font-weight: 600; transition: var(--transition); display: inline-flex; align-items: center; gap: 10px; border: none; cursor: pointer;}
         .btn-primary { background: var(--primary-accent); color: #000; }
         .btn-outline { background: transparent; border: 1px solid var(--primary-accent); color: var(--primary-accent); }
         .btn-outline:hover { background: var(--primary-accent); color: #000; }
         .footer-credit { text-align: center; color: var(--text-dim); padding: 40px; font-size: 0.8rem; border-top: 1px solid rgba(255,255,255,0.05); margin-top: 40px; }
+        
+        .section-title { margin: 40px 0 20px; font-size: 1.2rem; display: flex; align-items: center; gap: 10px; }
+        .section-title::after { content: ""; height: 1px; flex: 1; background: rgba(255,255,255,0.1); }
     </style>
 </head>
 <body>
@@ -194,10 +197,8 @@
         </div>
         <div class="swiper mySwiper" data-aos="zoom-in">
             <div class="swiper-wrapper">
-                <div class="swiper-slide"><img src="https://sprk-web.github.io/images/c1.jpg" alt="Teaching"></div>
                 <div class="swiper-slide"><img src="https://sprk-web.github.io/images/c2.jpg" alt="Students"></div>
                 <div class="swiper-slide"><img src="https://sprk-web.github.io/images/c3.jpg" alt="Classroom"></div>
-                <div class="swiper-slide"><img src="https://sprk-web.github.io/images/c4.jpg" alt="Lecture"></div>
                 <div class="swiper-slide"><img src="https://sprk-web.github.io/images/c5.jpg" alt="Lecture"></div>
             </div>
             <div class="swiper-pagination"></div>
@@ -271,7 +272,6 @@
         <footer>
             <div class="social-links" style="margin-bottom: 25px;">
                 <a href="https://www.instagram.com/gourav_raj003?igsh=YWI5aXo1bTlhcGxm"><i class="fab fa-instagram"></i></a>
-                <a href="#"><i class="fab fa-linkedin"></i></a>
                 <a href="mailto:rishabhk0000@gmail.com"><i class="fas fa-envelope"></i></a>
             </div>
             <p style="color: var(--text-dim); font-size: 0.9rem;">© 2026 Rishabh Verma • Designed by Shashank</p>
@@ -299,7 +299,7 @@
             autoplay: { delay: 2500, disableOnInteraction: false },
             pagination: { el: ".swiper-pagination" },
         });
-        
+
         // Testimonial Logic
         let currentIdx = 0;
         const items = document.querySelectorAll('.testimonial-item');
