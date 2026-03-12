@@ -35,20 +35,11 @@
 
         /* --- Theme Picker --- */
         .theme-panel {
-    position: fixed; 
-    top: 20px; 
-    right: 20px; 
-    background: var(--card-bg);
-    padding: 8px 12px; /* Adjusted padding */
-    border-radius: 50px; 
-    display: flex; 
-    gap: 10px; 
-    z-index: 1000;
-    border: 1px solid var(--glass-border); 
-    backdrop-filter: blur(15px);
-    -webkit-backdrop-filter: blur(15px); /* Safari support */
-    box-sizing: border-box;
-}
+            position: fixed; top: 20px; right: 20px; background: var(--card-bg);
+            padding: 10px; border-radius: 50px; display: flex; gap: 8px; z-index: 1000;
+            border: 1px solid var(--glass-border); backdrop-filter: blur(15px);
+        }
+        .color-dot { width: 20px; height: 20px; border-radius: 50%; cursor: pointer; transition: 0.3s; border: 2px solid rgba(0,0,0,0.2); }
 
         /* --- Hero Section --- */
         .hero-card {
@@ -150,7 +141,7 @@
         .btn-outline { background: transparent; border: 1px solid var(--primary-accent); color: var(--primary-accent); }
         .btn-outline:hover { background: var(--primary-accent); color: #000; }
         .footer-credit { text-align: center; color: var(--text-dim); padding: 40px; font-size: 0.8rem; border-top: 1px solid rgba(255,255,255,0.05); margin-top: 40px; }
-        
+
         .section-title { margin: 40px 0 20px; font-size: 1.2rem; display: flex; align-items: center; gap: 10px; }
         .section-title::after { content: ""; height: 1px; flex: 1; background: rgba(255,255,255,0.1); }
     </style>
