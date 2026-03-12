@@ -112,9 +112,18 @@
         }
         .call-btn:hover { transform: scale(1.05); filter: brightness(1.1); }
 
-        /* --- Testimonials --- */
-        .testimonial-slider { background: var(--card-bg); padding: 40px; border-radius: 30px; border: 1px solid var(--glass-border); text-align: center; }
-        .t-quote { font-style: italic; font-size: 1.2rem; color: var(--text-dim); margin-bottom: 20px; }
+                /* --- Carousel --- */
+        .testimonial-carousel {
+            background: var(--card-bg); border-radius: 30px; padding: 40px;
+            border: 1px solid rgba(255,255,255,0.05); text-align: center;
+        }
+        .testimonial-item { display: none; animation: fadeIn 0.5s ease; }
+        .testimonial-item.active { display: block; }
+        .testimonial-quote { font-style: italic; font-size: 1.1rem; margin-bottom: 20px; }
+        .testimonial-author { font-weight: bold; color: var(--primary-accent); }
+        .testimonial-nav { display: flex; justify: center; gap: 15px; margin-top: 20px; justify-content: center;}
+        .testimonial-nav button { background: #333; color: white; border: none; padding: 10px 15px; border-radius: 10px; cursor: pointer; }
+        .testimonial-nav button:hover { background: var(--primary-accent); color: black; }
 
         /* --- Footer --- */
         footer { text-align: center; padding: 60px 20px; border-top: 1px solid var(--glass-border); }
@@ -125,6 +134,13 @@
             h1 { font-size: 2.4rem; }
             .coaching-card { padding: 30px 20px; }
         }
+        
+        /* --- Utilities --- */
+        .btn { padding: 12px 30px; border-radius: 15px; text-decoration: none; font-weight: 600; transition: var(--transition); display: inline-flex; align-items: center; gap: 10px; border: none; cursor: pointer;}
+        .btn-primary { background: var(--primary-accent); color: #000; }
+        .btn-outline { background: transparent; border: 1px solid var(--primary-accent); color: var(--primary-accent); }
+        .btn-outline:hover { background: var(--primary-accent); color: #000; }
+        .footer-credit { text-align: center; color: var(--text-dim); padding: 40px; font-size: 0.8rem; border-top: 1px solid rgba(255,255,255,0.05); margin-top: 40px; }
     </style>
 </head>
 <body>
