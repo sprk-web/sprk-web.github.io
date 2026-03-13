@@ -9,7 +9,7 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css" />
     <style>
         :root {
-            --primary-accent: #ff7675; 
+            --primary-accent: #55efc4; 
             --bg-dark: #0a0b10;
             --card-bg: rgba(28, 29, 36, 0.8);
             --text-main: #ffffff;
@@ -98,7 +98,12 @@
 
         /* --- Coaching & CTA --- */
         .coaching-card {
-            background: linear-gradient(135deg, rgba(255,118,117,0.15) 0%, rgba(28,29,36,1) 100%);
+            background: linear-gradient(
+  135deg, 
+  rgba(85, 239, 196, 0.25) 0%, 
+  rgba(28, 29, 36, 1) 80%
+);
+;
             border-radius: 40px; padding: 50px; border: 1px solid var(--primary-accent);
             text-align: center; margin: 60px 0; position: relative;
         }
@@ -147,12 +152,6 @@
     </style>
 </head>
 <body>
-
-    <div class="theme-panel">
-        <div class="color-dot" style="background: #ff7675;" onclick="setTheme('#ff7675')"></div>
-        <div class="color-dot" style="background: #a29bfe;" onclick="setTheme('#a29bfe')"></div>
-        <div class="color-dot" style="background: #55efc4;" onclick="setTheme('#55efc4')"></div>
-    </div>
 
     <div class="container">
         <header class="hero-card" data-aos="zoom-in">
@@ -307,22 +306,6 @@
             items[currentIdx].classList.remove('active');
             currentIdx = (currentIdx + dir + items.length) % items.length;
             items[currentIdx].classList.add('active');
-        }
-
-        function setTheme(color) {
-            document.documentElement.style.setProperty('--primary-accent', color);
-            localStorage.setItem('pref-color', color);
-        }
-
-        // Theme Functionality
-        function setTheme(color) {
-            document.documentElement.style.setProperty('--primary-accent', color);
-            localStorage.setItem('portfolio-theme', color);
-        }
-
-        window.onload = () => {
-            const savedTheme = localStorage.getItem('portfolio-theme');
-            if(savedTheme) setTheme(savedTheme);
         }
     </script>
 </body>
