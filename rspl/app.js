@@ -2,7 +2,7 @@ import { isRememberSessionEnabled, setRememberSessionEnabled, supabase } from '.
 
 const $ = (s, root=document) => root.querySelector(s);
 const $$ = (s, root=document) => [...root.querySelectorAll(s)];
-const state = { user:null, profile:null, page:'overview', projects:[], workers:[], attendance:[], ledger:[], assignments:[], attendanceWorkerFilter:'' };
+const state = { user:null, profile:null, page:'overview', projects:[], workers:[], attendance:[], ledger:[], assignments:[], attendanceWorkerFilter:'', overviewProjectSearch:'', overviewProjectId:'' };
 let pendingConfirmation = null;
 const splashStartedAt = Date.now();
 const money = n => new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR',maximumFractionDigits:0}).format(Number(n||0));
@@ -140,12 +140,40 @@ function overviewPage() {
   const present=state.attendance.filter(a=>a.work_date===dateISO() && ['present','overtime'].includes(a.status)).length;
   const pending=state.ledger.filter(x=>x.entry_type==='wage' && x.status==='pending').reduce((s,x)=>s+Number(x.amount||0),0);
   const advances=state.ledger.filter(x=>x.entry_type==='advance').reduce((s,x)=>s+Number(x.amount||0),0);
-  const latest=state.attendance.slice(0,5).map(a=>`<tr><td>${esc(a.workers?.full_name||'—')}</td><td>${esc(a.projects?.name||'—')}</td><td>${niceDate(a.work_date)}</td><td>${status(a.status)}</td><td class="mono">${money(a.wage_amount)}</td></tr>`).join('');
   const canManage=isAdmin();
   return `<div class="flex flex-wrap items-center justify-between gap-3 mb-6"><div><div class="eyebrow">OPERATIONS SNAPSHOT</div><p class="text-sm text-slate-500 mt-1">A live overview of your workforce and site costs.</p></div><div class="flex gap-2"><button class="btn-secondary" data-action="refresh">${icon('refresh-cw')} Refresh data</button>${canManage?'<button class="btn-amber" data-action="add-worker">+ Register worker</button>':''}</div></div>
-  <div class="grid sm:grid-cols-2 xl:grid-cols-4 gap-4">${statCard('Registered workers',active,`${state.projects.length} active/recorded sites`,'users')}${statCard("Today's attendance",present,`of ${active} active workers`,'calendar-check')}${statCard('Wages to pay',money(pending),'Pending wage payments','wallet')}${statCard('Advances paid',money(advances),'All recorded worker advances','hand-coins')}</div>
-  <div class="grid xl:grid-cols-[1.5fr_1fr] gap-5 mt-6"><div class="card overflow-hidden">${sectionHead('Recent attendance','Latest attendance records')} ${latest?table(['Worker','Project','Work date','Status','Wage'],latest):empty('No attendance records yet')}</div>
-  <div class="card p-5">${sectionHead('Quick actions','Common workforce tasks')}<div class="space-y-3">${canManage?`<button class="quick-action" data-action="add-worker">${icon('user-plus')}<span><b>Register a worker</b><small>Create a worker profile and daily wage rate</small></span>${icon('chevron-right')}</button><button class="quick-action" data-action="mark-attendance">${icon('clipboard-check')}<span><b>Mark attendance</b><small>Record a daily shift at a site</small></span>${icon('chevron-right')}</button><button class="quick-action" data-action="add-payment">${icon('receipt')}<span><b>Record wage / advance</b><small>Update the worker's payment record</small></span>${icon('chevron-right')}</button>`:''}<button class="quick-action" data-page="workers">${icon('users')}<span><b>View worker directory</b><small>Find profiles and site assignments</small></span>${icon('chevron-right')}</button></div></div></div>`;
+  <div class="overview-stats-grid grid grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4">${statCard('Registered workers',active,`${state.projects.length} active/recorded sites`,'users')}${statCard("Today's attendance",present,`of ${active} active workers`,'calendar-check')}${statCard('Wages to pay',money(pending),'Pending wage payments','wallet')}${statCard('Advances paid',money(advances),'All recorded worker advances','hand-coins')}</div>
+  <div class="card p-5 mt-6">${overviewProjects()}</div>
+  <div class="card p-5 mt-5">${sectionHead('Quick actions','Common workforce tasks')}<div class="grid md:grid-cols-2 xl:grid-cols-4 gap-3">${canManage?`<button class="quick-action" data-action="add-worker">${icon('user-plus')}<span><b>Register a worker</b><small>Create a worker profile and daily wage rate</small></span>${icon('chevron-right')}</button><button class="quick-action" data-action="mark-attendance">${icon('clipboard-check')}<span><b>Mark attendance</b><small>Record a daily shift at a site</small></span>${icon('chevron-right')}</button><button class="quick-action" data-action="add-payment">${icon('receipt')}<span><b>Record wage / advance</b><small>Update the worker's payment record</small></span>${icon('chevron-right')}</button>`:''}<button class="quick-action" data-page="workers">${icon('users')}<span><b>View worker directory</b><small>Find profiles and site assignments</small></span>${icon('chevron-right')}</button></div></div>`;
+}
+function overviewProjects() {
+  const project=state.projects.find(item=>item.id===state.overviewProjectId);
+  if(project) return overviewProjectDetail(project);
+  return `${sectionHead('Projects','Search and select a project to view its assigned workers and mark attendance.')}
+    <label class="field-label block mb-4" for="overviewProjectSearch">Search projects<input id="overviewProjectSearch" class="field" type="search" value="${esc(state.overviewProjectSearch)}" placeholder="Search by project, location, code or status" autocomplete="off"></label>
+    <div id="overviewProjectResults" class="grid sm:grid-cols-2 xl:grid-cols-3 gap-4">${overviewProjectResultsHtml()}</div>`;
+}
+function overviewProjectResultsHtml() {
+  const query=state.overviewProjectSearch.trim().toLowerCase();
+  const projects=state.projects.filter(item=>[item.name,item.project_code,item.location,item.status].some(value=>String(value||'').toLowerCase().includes(query)));
+  const cards=projects.map(item=>{
+    const assigned=new Set(state.assignments.filter(assignment=>assignment.project_id===item.id&&!assignment.unassigned_at).map(assignment=>assignment.worker_id)).size;
+    return `<button type="button" class="card project-card" data-action="view-overview-project" data-id="${esc(item.id)}"><span class="flex items-start justify-between gap-3"><span class="min-w-0"><b class="block truncate text-sm text-slate-800">${esc(item.name)}</b><small class="block mt-1 truncate text-xs text-slate-500">${esc(item.location||item.project_code||'No location')}</small></span>${status(item.status||'active')}</span><span class="mt-5 flex items-center justify-between text-xs text-slate-500"><span>${assigned} worker${assigned===1?'':'s'} assigned</span><span class="font-semibold text-slate-700">View project ${icon('arrow-up-right')}</span></span></button>`;
+  }).join('');
+  return cards||empty(query?'No projects match your search':'No projects created');
+}
+function overviewProjectDetail(project) {
+  const assignmentIds=new Set(state.assignments.filter(assignment=>assignment.project_id===project.id&&!assignment.unassigned_at).map(assignment=>assignment.worker_id));
+  const workers=state.workers.filter(worker=>assignmentIds.has(worker.id)).sort((a,b)=>a.full_name.localeCompare(b.full_name));
+  const todayAttendance=state.attendance.filter(record=>record.project_id===project.id&&record.work_date===dateISO());
+  const rows=workers.map(worker=>{
+    const attendance=todayAttendance.find(record=>record.worker_id===worker.id);
+    const action=isAdmin()&&worker.status!=='inactive'?`<button class="btn-secondary" data-action="project-worker-attendance" data-project-id="${esc(project.id)}" data-worker-id="${esc(worker.id)}">${attendance?'Edit attendance':'Mark attendance'}</button>`:worker.status==='inactive'?'Inactive worker':'—';
+    return `<tr><td><div class="font-semibold text-slate-800">${esc(worker.full_name)}</div><div class="text-[10px] text-slate-400 mt-1">${esc(titleCase(worker.trade_type||'helper'))}</div></td><td>${status(worker.status||'active')}</td><td>${attendance?status(attendance.status):'<span class="text-slate-400">Not marked</span>'}</td><td>${attendance?`${Number(attendance.hours_worked||0).toFixed(1)} h`:'—'}</td><td>${action}</td></tr>`;
+  }).join('');
+  const hasMarkableWorker=workers.some(worker=>worker.status!=='inactive');
+  return `<div class="flex flex-wrap items-center justify-between gap-3 mb-5"><div><button type="button" class="text-xs font-semibold text-slate-500 hover:text-slate-900 mb-3" data-action="overview-projects">${icon('arrow-left')} All projects</button><h2 class="font-bold text-lg tracking-tight">${esc(project.name)}</h2><p class="text-xs text-slate-500 mt-1">${esc(project.location||'No location')} · ${workers.length} assigned worker${workers.length===1?'':'s'}</p></div><div class="flex gap-2">${isAdmin()&&hasMarkableWorker?`<button class="btn-primary" data-action="project-mark-attendance" data-id="${esc(project.id)}">Mark attendance</button>`:''}${isChair()?`<button class="btn-secondary" data-action="edit-project" data-id="${esc(project.id)}">Edit project</button>`:''}</div></div>
+    <div class="card overflow-hidden">${workers.length?table(['Worker','Worker status',"Today's attendance",'Hours worked','Action'],rows):empty('No workers are currently assigned to this project')}</div>`;
 }
 function workersPage() {
   const rows=state.workers.map(w=>{const assignment=currentSiteAssignment(w);return `<tr><td><div class="font-semibold text-slate-800">${esc(w.full_name)}</div><div class="text-[10px] text-slate-400 mt-1">${esc(w.phone||'No phone')}</div></td><td>${esc(titleCase(w.trade_type||'helper'))}</td><td class="mono">${money(w.daily_wage_rate)}</td><td>${esc(assignment?.projects?.name||'Unassigned')}</td><td>${status(w.status||'active')}</td><td><div class="row-actions"><button class="text-xs font-bold text-slate-600 hover:text-slate-950" data-action="worker-detail" data-id="${esc(w.id)}">View profile ↗</button>${isAdmin()?rowActions(w.id,'edit-worker','delete-worker'):''}</div></td></tr>`}).join('');
@@ -159,11 +187,11 @@ function attendancePage() {
   const creditedDays=records.reduce((total,a)=>total+attendanceDayCredit(a.status),0);
   const absent=records.filter(a=>a.status==='absent').length;
   const wages=records.reduce((total,a)=>total+Number(a.wage_amount||0),0);
-  const rows=records.map(a=>`<tr><td><div class="font-semibold text-slate-800">${esc(a.workers?.full_name||'—')}</div></td><td>${esc(a.projects?.name||'—')}</td><td>${niceDate(a.work_date)}</td><td>${status(a.status)}</td><td>${attendanceDayCredit(a.status).toFixed(1)} day</td><td>${Number(a.overtime_hours||0).toFixed(1)} h</td><td class="mono">${money(a.wage_amount)}</td>${isAdmin()?`<td><div class="row-actions"><button class="icon-button danger-button" data-action="delete-attendance" data-id="${esc(a.id)}" aria-label="Delete attendance record" title="Delete attendance">${icon('trash-2')}</button></div></td>`:''}</tr>`).join('');
+  const rows=records.map(a=>`<tr><td><div class="font-semibold text-slate-800">${esc(a.workers?.full_name||'—')}</div></td><td>${esc(a.projects?.name||'—')}</td><td>${niceDate(a.work_date)}</td><td>${status(a.status)}</td><td>${attendanceDayCredit(a.status).toFixed(1)} day</td><td>${Number(a.hours_worked||0).toFixed(1)} h</td><td>${Number(a.overtime_hours||0).toFixed(1)} h</td><td class="mono">${money(a.wage_amount)}</td>${isAdmin()?`<td><div class="row-actions"><button class="icon-button danger-button" data-action="delete-attendance" data-id="${esc(a.id)}" aria-label="Delete attendance record" title="Delete attendance">${icon('trash-2')}</button></div></td>`:''}</tr>`).join('');
   return `${sectionHead('Attendance register','Review each worker’s shift, credited days, overtime and calculated wages',isAdmin()?'<button class="btn-primary" data-action="mark-attendance">+ Mark attendance</button>':'')}
   <div class="grid sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-5">${statCard('Shifts shown',records.length,state.attendanceWorkerFilter?'For selected worker':'Attendance records','calendar-check')}${statCard('Credited days',creditedDays.toFixed(1),'Present = 1 day · Half-day = 0.5','check')}${statCard('Absences',absent,'Recorded absent shifts','x')}${statCard('Calculated wages',money(wages),'Based on the shifts shown','wallet')}</div>
   <div class="card p-4 mb-5"><label class="field-label" for="attendanceWorkerFilter">View attendance for a worker<select class="field" id="attendanceWorkerFilter"><option value="">All workers</option>${workerOptions}</select></label></div>
-  <div class="card overflow-hidden">${records.length?table(['Worker','Site','Work date','Shift status','Credited days','Overtime','Calculated wage',...(isAdmin()?['Actions']:[])],rows):empty(state.attendanceWorkerFilter?'No attendance entries for this worker':'No attendance entries')}</div>`;
+  <div class="card overflow-hidden">${records.length?table(['Worker','Site','Work date','Shift status','Credited days','Hours worked','Overtime','Calculated wage',...(isAdmin()?['Actions']:[])],rows):empty(state.attendanceWorkerFilter?'No attendance entries for this worker':'No attendance entries')}</div>`;
 }
 function attendanceDayCredit(attendanceStatus) {
   return ({present:1,overtime:1,half_day:.5,absent:0})[attendanceStatus]||0;
@@ -186,10 +214,10 @@ function workerPortal() {
   const advances=ledger.filter(x=>x.entry_type==='advance').reduce((s,x)=>s+Number(x.amount||0),0);
   const creditedDays=att.reduce((total,a)=>total+attendanceDayCredit(a.status),0);
   const attendanceWages=att.reduce((total,a)=>total+Number(a.wage_amount||0),0);
-  const recentAttendance=att.slice(0,20).map(a=>`<tr><td>${niceDate(a.work_date)}</td><td>${esc(a.projects?.name||'—')}</td><td>${status(a.status)}</td><td>${attendanceDayCredit(a.status).toFixed(1)} day</td><td>${Number(a.overtime_hours||0).toFixed(1)} h</td><td class="mono">${money(a.wage_amount)}</td></tr>`).join('');
+  const recentAttendance=att.slice(0,20).map(a=>`<tr><td>${niceDate(a.work_date)}</td><td>${esc(a.projects?.name||'—')}</td><td>${status(a.status)}</td><td>${attendanceDayCredit(a.status).toFixed(1)} day</td><td>${Number(a.hours_worked||0).toFixed(1)} h</td><td>${Number(a.overtime_hours||0).toFixed(1)} h</td><td class="mono">${money(a.wage_amount)}</td></tr>`).join('');
   return `<div class="flex flex-wrap items-center justify-between gap-3 mb-6"><div><div class="eyebrow">MY WORKFORCE RECORD</div><p class="text-sm text-slate-500 mt-1">Your attendance, calculated wages and payment history.</p></div><button class="btn-secondary" data-action="refresh">${icon('refresh-cw')} Refresh data</button></div>
   <div class="grid sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">${statCard('Attendance records',att.length,'Recorded shifts','calendar-check')}${statCard('Credited days',creditedDays.toFixed(1),'Present = 1 day · Half-day = 0.5','check')}${statCard('Calculated wages',money(attendanceWages),'Earned from recorded attendance','wallet')}${statCard('Advances received',money(advances),'All recorded advances','hand-coins')}</div>
-  <div class="card overflow-hidden mb-6">${sectionHead('My attendance','Latest shifts with site, status, credited days and calculated wages')}${att.length?table(['Work date','Site','Shift status','Credited days','Overtime','Calculated wage'],recentAttendance):empty('No attendance entries yet')}</div>
+  <div class="card overflow-hidden mb-6">${sectionHead('My attendance','Latest shifts with site, status, credited days and calculated wages')}${att.length?table(['Work date','Site','Shift status','Credited days','Hours worked','Overtime','Calculated wage'],recentAttendance):empty('No attendance entries yet')}</div>
   <div class="card overflow-hidden">${sectionHead('My payments','Recorded wage payments and advances')}${ledger.length?table(['Payment type','Date','Details','Amount','Status'],ledger.map(x=>`<tr><td>${esc(paymentType(x.entry_type))}</td><td>${niceDate(x.transaction_date)}</td><td>${esc(x.description||x.receipt_reference||'—')}</td><td class="mono">${money(x.amount)}</td><td>${status(x.status||'pending')}</td></tr>`).join('')):empty('No payment records yet')}</div>`;
 }
 function modal(title, subtitle, body) {
@@ -254,18 +282,24 @@ function workerModal(id=null) {
   </form>`);
 }
 function addWorkerModal() { workerModal(); }
-function attendanceModal() {
+function attendanceModal(workerId=null, projectId=null) {
   if(!isAdmin()) return;
+  const fixedProject=state.projects.find(project=>project.id===projectId);
+  if(projectId&&!fixedProject) throw new Error('The selected project could not be found.');
   const workers=state.workers
-    .filter(worker=>worker.status!=='inactive'&&assignedProjects(worker.id).length)
+    .filter(worker=>worker.status!=='inactive'&&assignedProjects(worker.id).length&&(!projectId||assignedProjects(worker.id).some(project=>project.id===projectId)))
     .sort((a,b)=>a.full_name.localeCompare(b.full_name));
-  modal('Mark attendance','Record one worker shift. Wage is calculated from the configured status and rate.',`<form id="attendanceForm" class="grid sm:grid-cols-2 gap-4">
-    <label class="field-label sm:col-span-2">Worker *<select class="field" name="worker_id" required><option value="">${workers.length?'Choose worker':'No active workers have an assigned site'}</option>${options(workers,'full_name')}</select></label>
-    <label class="field-label">Project site *<select class="field" name="project_id" required disabled><option value="">Choose a worker first</option></select></label>
+  if(workerId&&!workers.some(worker=>worker.id===workerId)) throw new Error('This worker is not actively assigned to the selected project.');
+  const existing=workerId?state.attendance.find(record=>record.worker_id===workerId&&record.project_id===projectId&&record.work_date===dateISO()):null;
+  const projectOptions=fixedProject?options([fixedProject],'name',fixedProject.id):'';
+  modal('Mark attendance','Record a worker shift, including the hours worked. Wage is calculated from the configured status and rate.',`<form id="attendanceForm" class="grid sm:grid-cols-2 gap-4" ${fixedProject?`data-project-id="${esc(fixedProject.id)}"`:''}>
+    <label class="field-label sm:col-span-2">Worker *<select class="field" name="worker_id" required><option value="">${workers.length?'Choose worker':'No active workers have an assigned site'}</option>${options(workers,'full_name',workerId||'')}</select></label>
+    <label class="field-label">Project site *<select class="field" name="project_id" required ${fixedProject?'':'disabled'}>${fixedProject?projectOptions:'<option value="">Choose a worker first</option>'}</select></label>
     <label class="field-label">Work date *<input class="field" type="date" name="work_date" value="${dateISO()}" required max="${dateISO()}"></label>
-    <label class="field-label">Attendance status *<select class="field" name="status" required><option value="present">Present (1 day)</option><option value="absent">Absent (0 day)</option><option value="half_day">Half-day (0.5 day)</option><option value="overtime">Present + overtime</option></select></label>
-    <label class="field-label">Overtime hours<input class="field" type="number" name="overtime_hours" min="0" max="24" step=".25" value="0"></label>
-    <label class="field-label sm:col-span-2">Notes<input class="field" name="notes" maxlength="300" placeholder="Optional site verification / shift note"></label>
+    <label class="field-label">Attendance status *<select class="field" name="status" required><option value="present" ${existing?.status==='present'?'selected':''}>Present (1 day)</option><option value="absent" ${existing?.status==='absent'?'selected':''}>Absent (0 day)</option><option value="half_day" ${existing?.status==='half_day'?'selected':''}>Half-day (0.5 day)</option><option value="overtime" ${existing?.status==='overtime'?'selected':''}>Present + overtime</option></select></label>
+    <label class="field-label">Hours worked *<input class="field" type="number" name="hours_worked" min="0" max="24" step=".25" value="${existing?Number(existing.hours_worked||0):8}" required></label>
+    <label class="field-label">Overtime hours<input class="field" type="number" name="overtime_hours" min="0" max="24" step=".25" value="${existing?Number(existing.overtime_hours||0):0}"></label>
+    <label class="field-label sm:col-span-2">Notes<input class="field" name="notes" maxlength="300" value="${esc(existing?.notes||'')}" placeholder="Optional site verification / shift note"></label>
     <div class="sm:col-span-2 flex justify-end gap-2 pt-3"><button type="button" class="btn-secondary" data-action="close-modal">Cancel</button><button class="btn-primary" type="submit">Save attendance</button></div>
   </form>`);
 }
@@ -408,13 +442,14 @@ async function submitAttendance(form) {
   const fd=new FormData(form), worker=state.workers.find(w=>w.id===fd.get('worker_id'));
   if(!worker) throw new Error('Choose a valid worker.');
   if(!assignedProjects(worker.id).some(project=>project.id===fd.get('project_id'))) throw new Error('Choose a site assigned to this worker.');
-  const statusValue=fd.get('status'), ot=Number(fd.get('overtime_hours')||0);
+  const statusValue=fd.get('status'), hoursWorked=Number(fd.get('hours_worked')), ot=Number(fd.get('overtime_hours')||0);
+  if(!Number.isFinite(hoursWorked)||hoursWorked<0||hoursWorked>24) throw new Error('Hours worked must be between 0 and 24.');
   if(ot<0||ot>24) throw new Error('Overtime must be between 0 and 24 hours.');
   const dayFactor={present:1,absent:0,half_day:.5,overtime:1}[statusValue];
   // Default policy: overtime is paid at 1.5x hourly equivalent after 8 hours.
   const overtimePay=Math.max(0,ot-8)*Number(worker.daily_wage_rate||0)/8*1.5;
   const wage=Number(worker.daily_wage_rate||0)*dayFactor+overtimePay;
-  const payload={worker_id:worker.id,project_id:fd.get('project_id'),work_date:fd.get('work_date'),status:statusValue,overtime_hours:ot,wage_amount:wage,notes:String(fd.get('notes')||'').trim()||null,marked_by:state.user.id};
+  const payload={worker_id:worker.id,project_id:fd.get('project_id'),work_date:fd.get('work_date'),status:statusValue,hours_worked:hoursWorked,overtime_hours:ot,wage_amount:wage,notes:String(fd.get('notes')||'').trim()||null,marked_by:state.user.id};
   const {error}=await supabase.from('attendance').upsert(payload,{onConflict:'worker_id,work_date,project_id'});
   if(error) throw error;
   $('#modal').close(); await loadData(); render(); notify('Attendance saved.');
@@ -476,8 +511,8 @@ async function workerDetail(id) {
   const ledger=state.ledger.filter(x=>x.worker_id===id);
   const creditedDays=att.reduce((total,a)=>total+attendanceDayCredit(a.status),0);
   const attendanceWages=att.reduce((total,a)=>total+Number(a.wage_amount||0),0);
-  const attendanceRows=att.slice(0,10).map(a=>`<tr><td>${niceDate(a.work_date)}</td><td>${esc(a.projects?.name||'—')}</td><td>${status(a.status)}</td><td>${attendanceDayCredit(a.status).toFixed(1)} day</td><td>${Number(a.overtime_hours||0).toFixed(1)} h</td><td class="mono">${money(a.wage_amount)}</td></tr>`).join('');
-  modal(esc(w.full_name),'Worker profile and attendance history',`<div class="grid grid-cols-2 gap-3"><div class="rounded-xl bg-slate-50 p-4"><div class="text-xs text-slate-500">Trade</div><b class="block mt-1">${esc(titleCase(w.trade_type||'helper'))}</b></div><div class="rounded-xl bg-slate-50 p-4"><div class="text-xs text-slate-500">Daily wage</div><b class="block mt-1 mono">${money(w.daily_wage_rate)}</b></div><div class="rounded-xl bg-slate-50 p-4"><div class="text-xs text-slate-500">Phone</div><b class="block mt-1">${esc(w.phone||'—')}</b></div><div class="rounded-xl bg-slate-50 p-4"><div class="text-xs text-slate-500">Status</div><div class="mt-1">${status(w.status)}</div></div></div><div class="grid grid-cols-3 gap-3 mt-5"><div class="rounded-xl bg-slate-50 p-3"><div class="text-[11px] text-slate-500">Attendance records</div><b class="block mt-1">${att.length}</b></div><div class="rounded-xl bg-slate-50 p-3"><div class="text-[11px] text-slate-500">Credited days</div><b class="block mt-1">${creditedDays.toFixed(1)}</b></div><div class="rounded-xl bg-slate-50 p-3"><div class="text-[11px] text-slate-500">Calculated wages</div><b class="block mt-1 mono">${money(attendanceWages)}</b></div></div><div class="mt-5"><h4 class="font-bold text-sm mb-2">Recent attendance</h4>${att.length?table(['Date','Site','Status','Credited days','Overtime','Wage'],attendanceRows):'<p class="text-xs text-slate-500">No attendance yet.</p>'}</div><div class="mt-5"><h4 class="font-bold text-sm mb-2">Recent payments (${ledger.length})</h4>${ledger.slice(0,5).map(x=>`<div class="flex justify-between border-t py-2 text-xs"><span>${niceDate(x.transaction_date)} · ${esc(paymentType(x.entry_type))}</span><b class="mono">${money(x.amount)}</b></div>`).join('')||'<p class="text-xs text-slate-500">No payment records yet.</p>'}</div>`);
+  const attendanceRows=att.slice(0,10).map(a=>`<tr><td>${niceDate(a.work_date)}</td><td>${esc(a.projects?.name||'—')}</td><td>${status(a.status)}</td><td>${attendanceDayCredit(a.status).toFixed(1)} day</td><td>${Number(a.hours_worked||0).toFixed(1)} h</td><td>${Number(a.overtime_hours||0).toFixed(1)} h</td><td class="mono">${money(a.wage_amount)}</td></tr>`).join('');
+  modal(esc(w.full_name),'Worker profile and attendance history',`<div class="grid grid-cols-2 gap-3"><div class="rounded-xl bg-slate-50 p-4"><div class="text-xs text-slate-500">Trade</div><b class="block mt-1">${esc(titleCase(w.trade_type||'helper'))}</b></div><div class="rounded-xl bg-slate-50 p-4"><div class="text-xs text-slate-500">Daily wage</div><b class="block mt-1 mono">${money(w.daily_wage_rate)}</b></div><div class="rounded-xl bg-slate-50 p-4"><div class="text-xs text-slate-500">Phone</div><b class="block mt-1">${esc(w.phone||'—')}</b></div><div class="rounded-xl bg-slate-50 p-4"><div class="text-xs text-slate-500">Status</div><div class="mt-1">${status(w.status)}</div></div></div><div class="grid grid-cols-3 gap-3 mt-5"><div class="rounded-xl bg-slate-50 p-3"><div class="text-[11px] text-slate-500">Attendance records</div><b class="block mt-1">${att.length}</b></div><div class="rounded-xl bg-slate-50 p-3"><div class="text-[11px] text-slate-500">Credited days</div><b class="block mt-1">${creditedDays.toFixed(1)}</b></div><div class="rounded-xl bg-slate-50 p-3"><div class="text-[11px] text-slate-500">Calculated wages</div><b class="block mt-1 mono">${money(attendanceWages)}</b></div></div><div class="mt-5"><h4 class="font-bold text-sm mb-2">Recent attendance</h4>${att.length?table(['Date','Site','Status','Credited days','Hours worked','Overtime','Wage'],attendanceRows):'<p class="text-xs text-slate-500">No attendance yet.</p>'}</div><div class="mt-5"><h4 class="font-bold text-sm mb-2">Recent payments (${ledger.length})</h4>${ledger.slice(0,5).map(x=>`<div class="flex justify-between border-t py-2 text-xs"><span>${niceDate(x.transaction_date)} · ${esc(paymentType(x.entry_type))}</span><b class="mono">${money(x.amount)}</b></div>`).join('')||'<p class="text-xs text-slate-500">No payment records yet.</p>'}</div>`);
 }
 document.addEventListener('click', async e=>{
   const page=e.target.closest('[data-page]'); if(page){setPage(page.dataset.page); if(innerWidth<1024)setSidebarOpen(false);return;}
@@ -490,6 +525,10 @@ document.addEventListener('click', async e=>{
       case 'edit-worker':workerModal(el.dataset.id);break;
       case 'delete-worker':await deleteRecord('workers',el.dataset.id,'Worker',isAdmin);break;
       case 'mark-attendance':attendanceModal();break;
+      case 'view-overview-project':state.overviewProjectId=el.dataset.id;render();break;
+      case 'overview-projects':state.overviewProjectId='';render();break;
+      case 'project-mark-attendance':attendanceModal(null,el.dataset.id);break;
+      case 'project-worker-attendance':attendanceModal(el.dataset.workerId,el.dataset.projectId);break;
       case 'delete-attendance':await deleteRecord('attendance',el.dataset.id,'Attendance record',isAdmin);break;
       case 'add-payment':paymentModal();break;
       case 'edit-ledger':paymentModal(el.dataset.id);break;
@@ -504,6 +543,12 @@ document.addEventListener('click', async e=>{
     }
   } catch(err) { notify(err.message||'Something went wrong.',true); }
 });
+document.addEventListener('input',e=>{
+  if(e.target.id!=='overviewProjectSearch') return;
+  state.overviewProjectSearch=e.target.value;
+  const results=$('#overviewProjectResults');
+  if(results) { results.innerHTML=overviewProjectResultsHtml(); refreshIcons(); }
+});
 document.addEventListener('change',e=>{
   if(e.target.id==='attendanceWorkerFilter') {
     state.attendanceWorkerFilter=e.target.value;
@@ -512,9 +557,26 @@ document.addEventListener('change',e=>{
   }
   if(e.target.matches('#attendanceForm [name="worker_id"]')) {
     const projectSelect=$('#attendanceForm [name="project_id"]');
-    const projects=assignedProjects(e.target.value);
+    const fixedProjectId=e.target.form.dataset.projectId;
+    const projects=assignedProjects(e.target.value).filter(project=>!fixedProjectId||project.id===fixedProjectId);
     projectSelect.innerHTML=`<option value="">${projects.length?'Choose site':'No sites assigned'}</option>${options(projects)}`;
     projectSelect.disabled=projects.length===0;
+    if(fixedProjectId&&projects.length) projectSelect.value=fixedProjectId;
+  }
+  if(e.target.matches('#attendanceForm [name="worker_id"], #attendanceForm [name="project_id"], #attendanceForm [name="work_date"]')) {
+    const form=$('#attendanceForm');
+    const existing=state.attendance.find(record=>record.worker_id===form.elements.worker_id.value&&record.project_id===form.elements.project_id.value&&record.work_date===form.elements.work_date.value);
+    if(existing) {
+      form.elements.status.value=existing.status;
+      form.elements.hours_worked.value=Number(existing.hours_worked||0);
+      form.elements.overtime_hours.value=Number(existing.overtime_hours||0);
+      form.elements.notes.value=existing.notes||'';
+    } else {
+      form.elements.status.value='present';
+      form.elements.hours_worked.value=8;
+      form.elements.overtime_hours.value=0;
+      form.elements.notes.value='';
+    }
   }
 });
 document.addEventListener('submit', async e=>{
