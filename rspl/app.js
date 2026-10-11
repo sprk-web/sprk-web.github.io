@@ -2,7 +2,7 @@ import { isRememberSessionEnabled, setRememberSessionEnabled, supabase } from '.
 
 const $ = (s, root=document) => root.querySelector(s);
 const $$ = (s, root=document) => [...root.querySelectorAll(s)];
-const state = { user:null, profile:null, page:'overview', projects:[], workers:[], attendance:[], ledger:[], assignments:[], attendanceWorkerFilter:'', overviewProjectSearch:'', overviewProjectId:'' };
+const state = { user:null, profile:null, page:'overview', projects:[], workers:[], attendance:[], ledger:[], assignments:[], attendanceWorkerFilter:'', overviewProjectSearch:'', siteProjectId:'' };
 let pendingConfirmation = null;
 const splashStartedAt = Date.now();
 const money = n => new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR',maximumFractionDigits:0}).format(Number(n||0));
@@ -121,18 +121,19 @@ async function loadData() {
 }
 function titleCase(s){return s.charAt(0).toUpperCase()+s.slice(1)}
 const paymentType = type => ({advance:'Advance paid',wage:'Wage payment',adjustment:'Adjustment'}[type]||titleCase(type||'wage'));
-function setPage(page) { state.page=page; $$('#nav [data-page]').forEach(b=>b.classList.toggle('active',b.dataset.page===page)); $('#pageTitle').textContent=({overview:'Overview',workers:'Workers',attendance:'Attendance',payroll:'Wages & advances',projects:'Projects & sites'})[page]; render(); }
+function setPage(page) { state.page=page; $$('#nav [data-page]').forEach(b=>b.classList.toggle('active',b.dataset.page===(page==='site'?'overview':page))); $('#pageTitle').textContent=page==='site'?(state.projects.find(project=>project.id===state.siteProjectId)?.name||'Project site'):({overview:'Overview',workers:'Workers',attendance:'Attendance',payroll:'Wages & advances',projects:'Projects & sites'})[page]; render(); }
 function statCard(label,value,sub,ico) { return `<div class="card stat-card"><div class="flex items-start justify-between"><div class="stat-label">${label}</div><div class="stat-icon">${icon(ico)}</div></div><div class="stat-value mt-4">${value}</div><div class="text-[11px] text-slate-500 mt-2">${sub}</div></div>`; }
 function sectionHead(title,sub,action='') { return `<div class="flex flex-wrap items-end justify-between gap-4 mb-5"><div><h2 class="font-bold text-lg tracking-tight">${title}</h2><p class="text-xs text-slate-500 mt-1">${sub}</p></div>${action}</div>`; }
 function empty(msg) { return `<div class="empty">${icon('inbox')}<div class="font-semibold text-slate-700">${msg}</div><div class="mt-1 text-xs">Records will appear here once added.</div></div>`; }
-function table(headers, rows) { return `<div class="table-wrap"><table class="data-table"><thead><tr>${headers.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${rows||''}</tbody></table></div>`; }
+function table(headers, rows, className='') { return `<div class="table-wrap"><table class="data-table ${className}"><thead><tr>${headers.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${rows||''}</tbody></table></div>`; }
 function rowActions(id, editAction, deleteAction) {
   return `<div class="row-actions"><button class="icon-button" data-action="${editAction}" data-id="${esc(id)}" aria-label="Edit record" title="Edit">${icon('pencil')}</button><button class="icon-button danger-button" data-action="${deleteAction}" data-id="${esc(id)}" aria-label="Delete record" title="Delete">${icon('trash-2')}</button></div>`;
 }
 function render() {
   const content=$('#pageContent');
   if (state.profile?.role==='worker') { content.innerHTML=workerPortal(); refreshIcons(); return; }
-  const renderers={overview:overviewPage,workers:workersPage,attendance:attendancePage,payroll:payrollPage,projects:projectsPage};
+  if(state.page==='site') $('#pageTitle').textContent=state.projects.find(project=>project.id===state.siteProjectId)?.name||'Project site';
+  const renderers={overview:overviewPage,site:projectSitePage,workers:workersPage,attendance:attendancePage,payroll:payrollPage,projects:projectsPage};
   content.innerHTML=(renderers[state.page]||overviewPage)(); refreshIcons();
 }
 function overviewPage() {
@@ -142,16 +143,14 @@ function overviewPage() {
   const advances=state.ledger.filter(x=>x.entry_type==='advance').reduce((s,x)=>s+Number(x.amount||0),0);
   const canManage=isAdmin();
   return `<div class="flex flex-wrap items-center justify-between gap-3 mb-6"><div><div class="eyebrow">OPERATIONS SNAPSHOT</div><p class="text-sm text-slate-500 mt-1">A live overview of your workforce and site costs.</p></div><div class="flex gap-2"><button class="btn-secondary" data-action="refresh">${icon('refresh-cw')} Refresh data</button>${canManage?'<button class="btn-amber" data-action="add-worker">+ Register worker</button>':''}</div></div>
-  <div class="overview-stats-grid grid grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4">${statCard('Registered workers',active,`${state.projects.length} active/recorded sites`,'users')}${statCard("Today's attendance",present,`of ${active} active workers`,'calendar-check')}${statCard('Wages to pay',money(pending),'Pending wage payments','wallet')}${statCard('Advances paid',money(advances),'All recorded worker advances','hand-coins')}</div>
+  <div class="overview-stats-grid stats-grid grid grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4">${statCard('Registered workers',active,`${state.projects.length} active/recorded sites`,'users')}${statCard("Today's attendance",present,`of ${active} active workers`,'calendar-check')}${statCard('Wages to pay',money(pending),'Pending wage payments','wallet')}${statCard('Advances paid',money(advances),'All recorded worker advances','hand-coins')}</div>
   <div class="card p-5 mt-6">${overviewProjects()}</div>
   <div class="card p-5 mt-5">${sectionHead('Quick actions','Common workforce tasks')}<div class="grid md:grid-cols-2 xl:grid-cols-4 gap-3">${canManage?`<button class="quick-action" data-action="add-worker">${icon('user-plus')}<span><b>Register a worker</b><small>Create a worker profile and daily wage rate</small></span>${icon('chevron-right')}</button><button class="quick-action" data-action="mark-attendance">${icon('clipboard-check')}<span><b>Mark attendance</b><small>Record a daily shift at a site</small></span>${icon('chevron-right')}</button><button class="quick-action" data-action="add-payment">${icon('receipt')}<span><b>Record wage / advance</b><small>Update the worker's payment record</small></span>${icon('chevron-right')}</button>`:''}<button class="quick-action" data-page="workers">${icon('users')}<span><b>View worker directory</b><small>Find profiles and site assignments</small></span>${icon('chevron-right')}</button></div></div>`;
 }
 function overviewProjects() {
-  const project=state.projects.find(item=>item.id===state.overviewProjectId);
-  if(project) return overviewProjectDetail(project);
   return `${sectionHead('Projects','Search and select a project to view its assigned workers and mark attendance.')}
     <label class="field-label block mb-4" for="overviewProjectSearch">Search projects<input id="overviewProjectSearch" class="field" type="search" value="${esc(state.overviewProjectSearch)}" placeholder="Search by project, location, code or status" autocomplete="off"></label>
-    <div id="overviewProjectResults" class="grid sm:grid-cols-2 xl:grid-cols-3 gap-4">${overviewProjectResultsHtml()}</div>`;
+    <div id="overviewProjectResults" class="project-results-grid grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">${overviewProjectResultsHtml()}</div>`;
 }
 function overviewProjectResultsHtml() {
   const query=state.overviewProjectSearch.trim().toLowerCase();
@@ -162,18 +161,24 @@ function overviewProjectResultsHtml() {
   }).join('');
   return cards||empty(query?'No projects match your search':'No projects created');
 }
-function overviewProjectDetail(project) {
+function projectSitePage() {
+  const project=state.projects.find(item=>item.id===state.siteProjectId);
+  if(!project) return `<div class="card p-5"><button type="button" class="btn-secondary mb-4" data-action="back-to-overview">${icon('arrow-left')} Back to overview</button>${empty('This project could not be found')}</div>`;
   const assignmentIds=new Set(state.assignments.filter(assignment=>assignment.project_id===project.id&&!assignment.unassigned_at).map(assignment=>assignment.worker_id));
   const workers=state.workers.filter(worker=>assignmentIds.has(worker.id)).sort((a,b)=>a.full_name.localeCompare(b.full_name));
   const todayAttendance=state.attendance.filter(record=>record.project_id===project.id&&record.work_date===dateISO());
   const rows=workers.map(worker=>{
     const attendance=todayAttendance.find(record=>record.worker_id===worker.id);
-    const action=isAdmin()&&worker.status!=='inactive'?`<button class="btn-secondary" data-action="project-worker-attendance" data-project-id="${esc(project.id)}" data-worker-id="${esc(worker.id)}">${attendance?'Edit attendance':'Mark attendance'}</button>`:worker.status==='inactive'?'Inactive worker':'—';
-    return `<tr><td><div class="font-semibold text-slate-800">${esc(worker.full_name)}</div><div class="text-[10px] text-slate-400 mt-1">${esc(titleCase(worker.trade_type||'helper'))}</div></td><td>${status(worker.status||'active')}</td><td>${attendance?status(attendance.status):'<span class="text-slate-400">Not marked</span>'}</td><td>${attendance?`${Number(attendance.hours_worked||0).toFixed(1)} h`:'—'}</td><td>${action}</td></tr>`;
+    const attendanceAction=isAdmin()&&worker.status!=='inactive'?`<button class="btn-secondary" data-action="project-worker-attendance" data-project-id="${esc(project.id)}" data-worker-id="${esc(worker.id)}">${attendance?'Edit attendance':'Mark attendance'}</button>`:worker.status==='inactive'?'Inactive worker':'—';
+    const reportAction=`<button class="btn-secondary" data-action="project-worker-report" data-project-id="${esc(project.id)}" data-worker-id="${esc(worker.id)}">View report</button>`;
+    return `<tr><td><div class="font-semibold text-slate-800">${esc(worker.full_name)}</div><div class="text-[10px] text-slate-400 mt-1">${esc(titleCase(worker.trade_type||'helper'))}</div></td><td>${status(worker.status||'active')}</td><td>${attendance?status(attendance.status):'<span class="text-slate-400">Not marked</span>'}</td><td>${attendance?`${Number(attendance.hours_worked||0).toFixed(1)} h`:'—'}</td><td><div class="flex flex-wrap gap-2">${attendanceAction}${reportAction}</div></td></tr>`;
   }).join('');
   const hasMarkableWorker=workers.some(worker=>worker.status!=='inactive');
-  return `<div class="flex flex-wrap items-center justify-between gap-3 mb-5"><div><button type="button" class="text-xs font-semibold text-slate-500 hover:text-slate-900 mb-3" data-action="overview-projects">${icon('arrow-left')} All projects</button><h2 class="font-bold text-lg tracking-tight">${esc(project.name)}</h2><p class="text-xs text-slate-500 mt-1">${esc(project.location||'No location')} · ${workers.length} assigned worker${workers.length===1?'':'s'}</p></div><div class="flex gap-2">${isAdmin()&&hasMarkableWorker?`<button class="btn-primary" data-action="project-mark-attendance" data-id="${esc(project.id)}">Mark attendance</button>`:''}${isChair()?`<button class="btn-secondary" data-action="edit-project" data-id="${esc(project.id)}">Edit project</button>`:''}</div></div>
-    <div class="card overflow-hidden">${workers.length?table(['Worker','Worker status',"Today's attendance",'Hours worked','Action'],rows):empty('No workers are currently assigned to this project')}</div>`;
+  const siteAttendance=state.attendance.filter(record=>record.project_id===project.id);
+  const presentToday=todayAttendance.filter(record=>['present','overtime'].includes(record.status)).length;
+  return `<div class="flex flex-wrap items-center justify-between gap-3 mb-5"><div><button type="button" class="text-xs font-semibold text-slate-500 hover:text-slate-900 mb-3" data-action="back-to-overview">${icon('arrow-left')} Back to overview</button><h2 class="font-bold text-lg tracking-tight">${esc(project.name)}</h2><p class="text-xs text-slate-500 mt-1">${esc(project.location||'No location')} · ${esc(project.project_code||'No project code')}</p></div><div class="flex flex-wrap gap-2">${isAdmin()&&hasMarkableWorker?`<button class="btn-primary" data-action="project-mark-attendance" data-id="${esc(project.id)}">Mark attendance</button>`:''}${isChair()?`<button class="btn-secondary" data-action="edit-project" data-id="${esc(project.id)}">Edit project</button>`:''}</div></div>
+    <div class="stats-grid grid grid-cols-2 sm:grid-cols-3 gap-4 mb-6">${statCard('Assigned workers',workers.length,'Currently assigned to this site','users')}${statCard("Today's attendance",presentToday,`of ${workers.length} assigned workers`,'calendar-check')}${statCard('Recent site shifts',siteAttendance.length,'From the latest attendance records','clipboard-check')}</div>
+    <div class="card overflow-hidden">${workers.length?table(['Worker','Worker status',"Today's attendance",'Hours worked','Attendance actions'],rows,'project-attendance-table'):empty('No workers are currently assigned to this project')}</div>`;
 }
 function workersPage() {
   const rows=state.workers.map(w=>{const assignment=currentSiteAssignment(w);return `<tr><td><div class="font-semibold text-slate-800">${esc(w.full_name)}</div><div class="text-[10px] text-slate-400 mt-1">${esc(w.phone||'No phone')}</div></td><td>${esc(titleCase(w.trade_type||'helper'))}</td><td class="mono">${money(w.daily_wage_rate)}</td><td>${esc(assignment?.projects?.name||'Unassigned')}</td><td>${status(w.status||'active')}</td><td><div class="row-actions"><button class="text-xs font-bold text-slate-600 hover:text-slate-950" data-action="worker-detail" data-id="${esc(w.id)}">View profile ↗</button>${isAdmin()?rowActions(w.id,'edit-worker','delete-worker'):''}</div></td></tr>`}).join('');
@@ -189,7 +194,7 @@ function attendancePage() {
   const wages=records.reduce((total,a)=>total+Number(a.wage_amount||0),0);
   const rows=records.map(a=>`<tr><td><div class="font-semibold text-slate-800">${esc(a.workers?.full_name||'—')}</div></td><td>${esc(a.projects?.name||'—')}</td><td>${niceDate(a.work_date)}</td><td>${status(a.status)}</td><td>${attendanceDayCredit(a.status).toFixed(1)} day</td><td>${Number(a.hours_worked||0).toFixed(1)} h</td><td>${Number(a.overtime_hours||0).toFixed(1)} h</td><td class="mono">${money(a.wage_amount)}</td>${isAdmin()?`<td><div class="row-actions"><button class="icon-button danger-button" data-action="delete-attendance" data-id="${esc(a.id)}" aria-label="Delete attendance record" title="Delete attendance">${icon('trash-2')}</button></div></td>`:''}</tr>`).join('');
   return `${sectionHead('Attendance register','Review each worker’s shift, credited days, overtime and calculated wages',isAdmin()?'<button class="btn-primary" data-action="mark-attendance">+ Mark attendance</button>':'')}
-  <div class="grid sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-5">${statCard('Shifts shown',records.length,state.attendanceWorkerFilter?'For selected worker':'Attendance records','calendar-check')}${statCard('Credited days',creditedDays.toFixed(1),'Present = 1 day · Half-day = 0.5','check')}${statCard('Absences',absent,'Recorded absent shifts','x')}${statCard('Calculated wages',money(wages),'Based on the shifts shown','wallet')}</div>
+  <div class="stats-grid grid grid-cols-2 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-5">${statCard('Shifts shown',records.length,state.attendanceWorkerFilter?'For selected worker':'Attendance records','calendar-check')}${statCard('Credited days',creditedDays.toFixed(1),'Present = 1 day · Half-day = 0.5','check')}${statCard('Absences',absent,'Recorded absent shifts','x')}${statCard('Calculated wages',money(wages),'Based on the shifts shown','wallet')}</div>
   <div class="card p-4 mb-5"><label class="field-label" for="attendanceWorkerFilter">View attendance for a worker<select class="field" id="attendanceWorkerFilter"><option value="">All workers</option>${workerOptions}</select></label></div>
   <div class="card overflow-hidden">${records.length?table(['Worker','Site','Work date','Shift status','Credited days','Hours worked','Overtime','Calculated wage',...(isAdmin()?['Actions']:[])],rows):empty(state.attendanceWorkerFilter?'No attendance entries for this worker':'No attendance entries')}</div>`;
 }
@@ -200,7 +205,7 @@ function payrollPage() {
   const rows=state.ledger.map(x=>`<tr><td>${esc(x.workers?.full_name||'—')}</td><td>${esc(paymentType(x.entry_type))}</td><td>${niceDate(x.transaction_date)}</td><td>${esc(x.description||x.receipt_reference||'—')}</td><td class="mono">${money(x.amount)}</td><td>${status(x.status||'pending')}</td><td>${esc(x.receipt_reference||'—')}</td>${isAdmin()?`<td>${rowActions(x.id,'edit-ledger','delete-ledger')}</td>`:''}</tr>`).join('');
   const total=state.ledger.filter(x=>x.entry_type==='wage').reduce((s,x)=>s+Number(x.amount||0),0);
   const pending=state.ledger.filter(x=>x.entry_type==='wage'&&x.status==='pending').reduce((s,x)=>s+Number(x.amount||0),0);
-  return `<div class="grid sm:grid-cols-3 gap-4 mb-6">${statCard('Wages recorded',money(total),'Total wage payments recorded','wallet')}${statCard('Wages to pay',money(pending),'Wage payments still pending','clock-3')}${statCard('Payment records',state.ledger.length,'Wages, advances and adjustments','receipt')}</div>${sectionHead('Worker payments','Wage payments, advances and site expenses',isAdmin()?'<button class="btn-primary" data-action="add-payment">+ Record payment</button>':'')}<div class="card overflow-hidden">${state.ledger.length?table(['Worker','Payment type','Date','Payment details','Amount','Status','Voucher / receipt no.',...(isAdmin()?['Actions']:[])],rows):empty('No payment records')}</div><p class="text-[11px] text-slate-500 mt-3">Check attendance and any advances paid before settling a worker’s wages.</p>`;
+  return `<div class="stats-grid grid grid-cols-2 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">${statCard('Wages recorded',money(total),'Total wage payments recorded','wallet')}${statCard('Wages to pay',money(pending),'Wage payments still pending','clock-3')}${statCard('Payment records',state.ledger.length,'Wages, advances and adjustments','receipt')}</div>${sectionHead('Worker payments','Wage payments, advances and site expenses',isAdmin()?'<button class="btn-primary" data-action="add-payment">+ Record payment</button>':'')}<div class="card overflow-hidden">${state.ledger.length?table(['Worker','Payment type','Date','Payment details','Amount','Status','Voucher / receipt no.',...(isAdmin()?['Actions']:[])],rows):empty('No payment records')}</div><p class="text-[11px] text-slate-500 mt-3">Check attendance and any advances paid before settling a worker’s wages.</p>`;
 }
 function projectsPage() {
   const rows=state.projects.map(p=>`<tr><td><div class="font-semibold">${esc(p.name)}</div><div class="text-[10px] text-slate-400 mt-1">${esc(p.project_code||'No code')}</div></td><td>${esc(p.location||'—')}</td><td>${status(p.status||'active')}</td><td>${state.assignments.filter(a=>a.project_id===p.id&&!a.unassigned_at).length} assigned</td><td>${niceDate(p.start_date)}</td>${isChair()?`<td>${rowActions(p.id,'edit-project','delete-project')}</td>`:''}</tr>`).join('');
@@ -216,7 +221,7 @@ function workerPortal() {
   const attendanceWages=att.reduce((total,a)=>total+Number(a.wage_amount||0),0);
   const recentAttendance=att.slice(0,20).map(a=>`<tr><td>${niceDate(a.work_date)}</td><td>${esc(a.projects?.name||'—')}</td><td>${status(a.status)}</td><td>${attendanceDayCredit(a.status).toFixed(1)} day</td><td>${Number(a.hours_worked||0).toFixed(1)} h</td><td>${Number(a.overtime_hours||0).toFixed(1)} h</td><td class="mono">${money(a.wage_amount)}</td></tr>`).join('');
   return `<div class="flex flex-wrap items-center justify-between gap-3 mb-6"><div><div class="eyebrow">MY WORKFORCE RECORD</div><p class="text-sm text-slate-500 mt-1">Your attendance, calculated wages and payment history.</p></div><button class="btn-secondary" data-action="refresh">${icon('refresh-cw')} Refresh data</button></div>
-  <div class="grid sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">${statCard('Attendance records',att.length,'Recorded shifts','calendar-check')}${statCard('Credited days',creditedDays.toFixed(1),'Present = 1 day · Half-day = 0.5','check')}${statCard('Calculated wages',money(attendanceWages),'Earned from recorded attendance','wallet')}${statCard('Advances received',money(advances),'All recorded advances','hand-coins')}</div>
+  <div class="stats-grid grid grid-cols-2 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">${statCard('Attendance records',att.length,'Recorded shifts','calendar-check')}${statCard('Credited days',creditedDays.toFixed(1),'Present = 1 day · Half-day = 0.5','check')}${statCard('Calculated wages',money(attendanceWages),'Earned from recorded attendance','wallet')}${statCard('Advances received',money(advances),'All recorded advances','hand-coins')}</div>
   <div class="card overflow-hidden mb-6">${sectionHead('My attendance','Latest shifts with site, status, credited days and calculated wages')}${att.length?table(['Work date','Site','Shift status','Credited days','Hours worked','Overtime','Calculated wage'],recentAttendance):empty('No attendance entries yet')}</div>
   <div class="card overflow-hidden">${sectionHead('My payments','Recorded wage payments and advances')}${ledger.length?table(['Payment type','Date','Details','Amount','Status'],ledger.map(x=>`<tr><td>${esc(paymentType(x.entry_type))}</td><td>${niceDate(x.transaction_date)}</td><td>${esc(x.description||x.receipt_reference||'—')}</td><td class="mono">${money(x.amount)}</td><td>${status(x.status||'pending')}</td></tr>`).join('')):empty('No payment records yet')}</div>`;
 }
@@ -514,6 +519,18 @@ async function workerDetail(id) {
   const attendanceRows=att.slice(0,10).map(a=>`<tr><td>${niceDate(a.work_date)}</td><td>${esc(a.projects?.name||'—')}</td><td>${status(a.status)}</td><td>${attendanceDayCredit(a.status).toFixed(1)} day</td><td>${Number(a.hours_worked||0).toFixed(1)} h</td><td>${Number(a.overtime_hours||0).toFixed(1)} h</td><td class="mono">${money(a.wage_amount)}</td></tr>`).join('');
   modal(esc(w.full_name),'Worker profile and attendance history',`<div class="grid grid-cols-2 gap-3"><div class="rounded-xl bg-slate-50 p-4"><div class="text-xs text-slate-500">Trade</div><b class="block mt-1">${esc(titleCase(w.trade_type||'helper'))}</b></div><div class="rounded-xl bg-slate-50 p-4"><div class="text-xs text-slate-500">Daily wage</div><b class="block mt-1 mono">${money(w.daily_wage_rate)}</b></div><div class="rounded-xl bg-slate-50 p-4"><div class="text-xs text-slate-500">Phone</div><b class="block mt-1">${esc(w.phone||'—')}</b></div><div class="rounded-xl bg-slate-50 p-4"><div class="text-xs text-slate-500">Status</div><div class="mt-1">${status(w.status)}</div></div></div><div class="grid grid-cols-3 gap-3 mt-5"><div class="rounded-xl bg-slate-50 p-3"><div class="text-[11px] text-slate-500">Attendance records</div><b class="block mt-1">${att.length}</b></div><div class="rounded-xl bg-slate-50 p-3"><div class="text-[11px] text-slate-500">Credited days</div><b class="block mt-1">${creditedDays.toFixed(1)}</b></div><div class="rounded-xl bg-slate-50 p-3"><div class="text-[11px] text-slate-500">Calculated wages</div><b class="block mt-1 mono">${money(attendanceWages)}</b></div></div><div class="mt-5"><h4 class="font-bold text-sm mb-2">Recent attendance</h4>${att.length?table(['Date','Site','Status','Credited days','Hours worked','Overtime','Wage'],attendanceRows):'<p class="text-xs text-slate-500">No attendance yet.</p>'}</div><div class="mt-5"><h4 class="font-bold text-sm mb-2">Recent payments (${ledger.length})</h4>${ledger.slice(0,5).map(x=>`<div class="flex justify-between border-t py-2 text-xs"><span>${niceDate(x.transaction_date)} · ${esc(paymentType(x.entry_type))}</span><b class="mono">${money(x.amount)}</b></div>`).join('')||'<p class="text-xs text-slate-500">No payment records yet.</p>'}</div>`);
 }
+async function projectWorkerAttendanceReport(workerId, projectId) {
+  const worker=state.workers.find(item=>item.id===workerId);
+  const project=state.projects.find(item=>item.id===projectId);
+  if(!worker||!project) throw new Error('The selected worker or project could not be found.');
+  const {data,error}=await supabase.from('attendance').select('*').eq('worker_id',workerId).eq('project_id',projectId).order('work_date',{ascending:false});
+  if(error) throw error;
+  const records=data||[];
+  const creditedDays=records.reduce((total,record)=>total+attendanceDayCredit(record.status),0);
+  const wages=records.reduce((total,record)=>total+Number(record.wage_amount||0),0);
+  const rows=records.map(record=>`<tr><td>${niceDate(record.work_date)}</td><td>${status(record.status)}</td><td>${attendanceDayCredit(record.status).toFixed(1)} day</td><td>${Number(record.hours_worked||0).toFixed(1)} h</td><td>${Number(record.overtime_hours||0).toFixed(1)} h</td><td class="mono">${money(record.wage_amount)}</td></tr>`).join('');
+  modal(`${esc(worker.full_name)} · Attendance report`,`Attendance recorded at ${esc(project.name)} only.`,`${records.length?`<div class="grid grid-cols-3 gap-3 mb-5"><div class="rounded-xl bg-slate-50 p-3"><div class="text-[11px] text-slate-500">Shifts</div><b class="block mt-1">${records.length}</b></div><div class="rounded-xl bg-slate-50 p-3"><div class="text-[11px] text-slate-500">Credited days</div><b class="block mt-1">${creditedDays.toFixed(1)}</b></div><div class="rounded-xl bg-slate-50 p-3"><div class="text-[11px] text-slate-500">Calculated wages</div><b class="block mt-1 mono">${money(wages)}</b></div></div>${table(['Work date','Status','Credited days','Hours worked','Overtime','Wage'],rows)}`:'<div class="empty">No attendance records for this worker at this site.</div>'}`);
+}
 document.addEventListener('click', async e=>{
   const page=e.target.closest('[data-page]'); if(page){setPage(page.dataset.page); if(innerWidth<1024)setSidebarOpen(false);return;}
   const el=e.target.closest('[data-action]'); if(!el)return;
@@ -525,10 +542,11 @@ document.addEventListener('click', async e=>{
       case 'edit-worker':workerModal(el.dataset.id);break;
       case 'delete-worker':await deleteRecord('workers',el.dataset.id,'Worker',isAdmin);break;
       case 'mark-attendance':attendanceModal();break;
-      case 'view-overview-project':state.overviewProjectId=el.dataset.id;render();break;
-      case 'overview-projects':state.overviewProjectId='';render();break;
+      case 'view-overview-project':state.siteProjectId=el.dataset.id;setPage('site');break;
+      case 'back-to-overview':setPage('overview');break;
       case 'project-mark-attendance':attendanceModal(null,el.dataset.id);break;
       case 'project-worker-attendance':attendanceModal(el.dataset.workerId,el.dataset.projectId);break;
+      case 'project-worker-report':await projectWorkerAttendanceReport(el.dataset.workerId,el.dataset.projectId);break;
       case 'delete-attendance':await deleteRecord('attendance',el.dataset.id,'Attendance record',isAdmin);break;
       case 'add-payment':paymentModal();break;
       case 'edit-ledger':paymentModal(el.dataset.id);break;
