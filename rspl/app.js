@@ -159,11 +159,11 @@ function attendancePage() {
   const creditedDays=records.reduce((total,a)=>total+attendanceDayCredit(a.status),0);
   const absent=records.filter(a=>a.status==='absent').length;
   const wages=records.reduce((total,a)=>total+Number(a.wage_amount||0),0);
-  const rows=records.map(a=>`<tr><td><div class="font-semibold text-slate-800">${esc(a.workers?.full_name||'—')}</div></td><td>${esc(a.projects?.name||'—')}</td><td>${niceDate(a.work_date)}</td><td>${status(a.status)}</td><td>${attendanceDayCredit(a.status).toFixed(1)} day</td><td>${Number(a.overtime_hours||0).toFixed(1)} h</td><td class="mono">${money(a.wage_amount)}</td></tr>`).join('');
+  const rows=records.map(a=>`<tr><td><div class="font-semibold text-slate-800">${esc(a.workers?.full_name||'—')}</div></td><td>${esc(a.projects?.name||'—')}</td><td>${niceDate(a.work_date)}</td><td>${status(a.status)}</td><td>${attendanceDayCredit(a.status).toFixed(1)} day</td><td>${Number(a.overtime_hours||0).toFixed(1)} h</td><td class="mono">${money(a.wage_amount)}</td>${isAdmin()?`<td><div class="row-actions"><button class="icon-button danger-button" data-action="delete-attendance" data-id="${esc(a.id)}" aria-label="Delete attendance record" title="Delete attendance">${icon('trash-2')}</button></div></td>`:''}</tr>`).join('');
   return `${sectionHead('Attendance register','Review each worker’s shift, credited days, overtime and calculated wages',isAdmin()?'<button class="btn-primary" data-action="mark-attendance">+ Mark attendance</button>':'')}
   <div class="grid sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-5">${statCard('Shifts shown',records.length,state.attendanceWorkerFilter?'For selected worker':'Attendance records','calendar-check')}${statCard('Credited days',creditedDays.toFixed(1),'Present = 1 day · Half-day = 0.5','check')}${statCard('Absences',absent,'Recorded absent shifts','x')}${statCard('Calculated wages',money(wages),'Based on the shifts shown','wallet')}</div>
   <div class="card p-4 mb-5"><label class="field-label" for="attendanceWorkerFilter">View attendance for a worker<select class="field" id="attendanceWorkerFilter"><option value="">All workers</option>${workerOptions}</select></label></div>
-  <div class="card overflow-hidden">${records.length?table(['Worker','Site','Work date','Shift status','Credited days','Overtime','Calculated wage'],rows):empty(state.attendanceWorkerFilter?'No attendance entries for this worker':'No attendance entries')}</div>`;
+  <div class="card overflow-hidden">${records.length?table(['Worker','Site','Work date','Shift status','Credited days','Overtime','Calculated wage',...(isAdmin()?['Actions']:[])],rows):empty(state.attendanceWorkerFilter?'No attendance entries for this worker':'No attendance entries')}</div>`;
 }
 function attendanceDayCredit(attendanceStatus) {
   return ({present:1,overtime:1,half_day:.5,absent:0})[attendanceStatus]||0;
@@ -490,6 +490,7 @@ document.addEventListener('click', async e=>{
       case 'edit-worker':workerModal(el.dataset.id);break;
       case 'delete-worker':await deleteRecord('workers',el.dataset.id,'Worker',isAdmin);break;
       case 'mark-attendance':attendanceModal();break;
+      case 'delete-attendance':await deleteRecord('attendance',el.dataset.id,'Attendance record',isAdmin);break;
       case 'add-payment':paymentModal();break;
       case 'edit-ledger':paymentModal(el.dataset.id);break;
       case 'delete-ledger':await deleteRecord('payments_ledger',el.dataset.id,'Payment record',isAdmin);break;
