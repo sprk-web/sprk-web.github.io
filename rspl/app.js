@@ -2,7 +2,7 @@ import { isRememberSessionEnabled, setRememberSessionEnabled, supabase } from '.
 
 const $ = (s, root=document) => root.querySelector(s);
 const $$ = (s, root=document) => [...root.querySelectorAll(s)];
-const state = { user:null, profile:null, page:'overview', projects:[], workers:[], attendance:[], ledger:[], assignments:[] };
+const state = { user:null, profile:null, page:'overview', projects:[], workers:[], attendance:[], ledger:[], assignments:[], attendanceWorkerFilter:'' };
 let pendingConfirmation = null;
 const splashStartedAt = Date.now();
 const money = n => new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR',maximumFractionDigits:0}).format(Number(n||0));
@@ -13,7 +13,7 @@ const dateISO = () => {
 const niceDate = d => d ? new Date(`${d}T00:00:00`).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}) : '—';
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const initials = s => (s||'RS').split(/\s+/).slice(0,2).map(x=>x[0]).join('').toUpperCase();
-const status = s => `<span class="status ${esc(String(s||'neutral').toLowerCase())}">${esc(String(s||'—').replaceAll('_',' '))}</span>`;
+const status = s => `<span class="status ${esc(String(s||'neutral').toLowerCase())}">${esc(titleCase(String(s||'—').replaceAll('_',' ')))}</span>`;
 const isChair = () => state.profile?.role === 'chairman';
 const isAdmin = () => ['chairman','admin'].includes(state.profile?.role);
 let noticeTimeout;
@@ -112,7 +112,7 @@ function updateProfileSummary() {
 async function loadData() {
   const tasks = [
     ['projects',()=>supabase.from('projects').select('*').order('created_at',{ascending:false})],
-    ['workers',()=>supabase.from('workers').select('*, site_assignments(project_id, projects(name))').order('created_at',{ascending:false})],
+    ['workers',()=>supabase.from('workers').select('*, site_assignments(project_id, assigned_at, unassigned_at, projects(name))').order('created_at',{ascending:false})],
     ['attendance',()=>supabase.from('attendance').select('*, workers(full_name, daily_wage_rate), projects(name)').order('work_date',{ascending:false}).limit(300)],
     ['ledger',()=>supabase.from('payments_ledger').select('*, workers(full_name), projects(name)').order('transaction_date',{ascending:false}).limit(300)],
     ['assignments',()=>supabase.from('site_assignments').select('*, workers(full_name), projects(name)')]
@@ -148,12 +148,25 @@ function overviewPage() {
   <div class="card p-5">${sectionHead('Quick actions','Common workforce tasks')}<div class="space-y-3">${canManage?`<button class="quick-action" data-action="add-worker">${icon('user-plus')}<span><b>Register a worker</b><small>Create a worker profile and daily wage rate</small></span>${icon('chevron-right')}</button><button class="quick-action" data-action="mark-attendance">${icon('clipboard-check')}<span><b>Mark attendance</b><small>Record a daily shift at a site</small></span>${icon('chevron-right')}</button><button class="quick-action" data-action="add-payment">${icon('receipt')}<span><b>Record wage / advance</b><small>Update the worker's payment record</small></span>${icon('chevron-right')}</button>`:''}<button class="quick-action" data-page="workers">${icon('users')}<span><b>View worker directory</b><small>Find profiles and site assignments</small></span>${icon('chevron-right')}</button></div></div></div>`;
 }
 function workersPage() {
-  const rows=state.workers.map(w=>`<tr><td><div class="font-semibold text-slate-800">${esc(w.full_name)}</div><div class="text-[10px] text-slate-400 mt-1">${esc(w.phone||'No phone')}</div></td><td>${esc(titleCase(w.trade_type||'helper'))}</td><td class="mono">${money(w.daily_wage_rate)}</td><td>${esc(w.site_assignments?.[0]?.projects?.name||'Unassigned')}</td><td>${status(w.status||'active')}</td><td><div class="row-actions"><button class="text-xs font-bold text-slate-600 hover:text-slate-950" data-action="worker-detail" data-id="${esc(w.id)}">View profile ↗</button>${isAdmin()?rowActions(w.id,'edit-worker','delete-worker'):''}</div></td></tr>`).join('');
+  const rows=state.workers.map(w=>{const assignment=currentSiteAssignment(w);return `<tr><td><div class="font-semibold text-slate-800">${esc(w.full_name)}</div><div class="text-[10px] text-slate-400 mt-1">${esc(w.phone||'No phone')}</div></td><td>${esc(titleCase(w.trade_type||'helper'))}</td><td class="mono">${money(w.daily_wage_rate)}</td><td>${esc(assignment?.projects?.name||'Unassigned')}</td><td>${status(w.status||'active')}</td><td><div class="row-actions"><button class="text-xs font-bold text-slate-600 hover:text-slate-950" data-action="worker-detail" data-id="${esc(w.id)}">View profile ↗</button>${isAdmin()?rowActions(w.id,'edit-worker','delete-worker'):''}</div></td></tr>`}).join('');
   return `${sectionHead('Worker directory','Worker profiles, trades, rates and current assignments',isAdmin()?'<button class="btn-primary" data-action="add-worker">+ Register worker</button>':'')}<div class="card overflow-hidden">${state.workers.length?table(['Worker','Trade','Daily rate','Assigned site','Status','Actions'],rows):empty('No workers registered')}</div>`;
 }
 function attendancePage() {
-  const rows=state.attendance.map(a=>`<tr><td>${esc(a.workers?.full_name||'—')}</td><td>${esc(a.projects?.name||'—')}</td><td>${niceDate(a.work_date)}</td><td>${status(a.status)}</td><td>${Number(a.overtime_hours||0).toFixed(1)} h</td><td class="mono">${money(a.wage_amount)}</td></tr>`).join('');
-  return `${sectionHead('Attendance register','Daily shift status, overtime and calculated wages',isAdmin()?'<button class="btn-primary" data-action="mark-attendance">+ Mark attendance</button>':'')}<div class="card overflow-hidden">${state.attendance.length?table(['Worker','Project','Date','Status','Overtime','Calculated wage'],rows):empty('No attendance entries')}</div>`;
+  const workerOptions=state.workers.filter(w=>state.attendance.some(a=>a.worker_id===w.id))
+    .sort((a,b)=>a.full_name.localeCompare(b.full_name))
+    .map(w=>`<option value="${esc(w.id)}" ${w.id===state.attendanceWorkerFilter?'selected':''}>${esc(w.full_name)}</option>`).join('');
+  const records=state.attendance.filter(a=>!state.attendanceWorkerFilter||a.worker_id===state.attendanceWorkerFilter);
+  const creditedDays=records.reduce((total,a)=>total+attendanceDayCredit(a.status),0);
+  const absent=records.filter(a=>a.status==='absent').length;
+  const wages=records.reduce((total,a)=>total+Number(a.wage_amount||0),0);
+  const rows=records.map(a=>`<tr><td><div class="font-semibold text-slate-800">${esc(a.workers?.full_name||'—')}</div></td><td>${esc(a.projects?.name||'—')}</td><td>${niceDate(a.work_date)}</td><td>${status(a.status)}</td><td>${attendanceDayCredit(a.status).toFixed(1)} day</td><td>${Number(a.overtime_hours||0).toFixed(1)} h</td><td class="mono">${money(a.wage_amount)}</td></tr>`).join('');
+  return `${sectionHead('Attendance register','Review each worker’s shift, credited days, overtime and calculated wages',isAdmin()?'<button class="btn-primary" data-action="mark-attendance">+ Mark attendance</button>':'')}
+  <div class="grid sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-5">${statCard('Shifts shown',records.length,state.attendanceWorkerFilter?'For selected worker':'Attendance records','calendar-check')}${statCard('Credited days',creditedDays.toFixed(1),'Present = 1 day · Half-day = 0.5','check')}${statCard('Absences',absent,'Recorded absent shifts','x')}${statCard('Calculated wages',money(wages),'Based on the shifts shown','wallet')}</div>
+  <div class="card p-4 mb-5"><label class="field-label" for="attendanceWorkerFilter">View attendance for a worker<select class="field" id="attendanceWorkerFilter"><option value="">All workers</option>${workerOptions}</select></label></div>
+  <div class="card overflow-hidden">${records.length?table(['Worker','Site','Work date','Shift status','Credited days','Overtime','Calculated wage'],rows):empty(state.attendanceWorkerFilter?'No attendance entries for this worker':'No attendance entries')}</div>`;
+}
+function attendanceDayCredit(attendanceStatus) {
+  return ({present:1,overtime:1,half_day:.5,absent:0})[attendanceStatus]||0;
 }
 function payrollPage() {
   const rows=state.ledger.map(x=>`<tr><td>${esc(x.workers?.full_name||'—')}</td><td>${esc(paymentType(x.entry_type))}</td><td>${niceDate(x.transaction_date)}</td><td>${esc(x.description||x.receipt_reference||'—')}</td><td class="mono">${money(x.amount)}</td><td>${status(x.status||'pending')}</td><td>${esc(x.receipt_reference||'—')}</td>${isAdmin()?`<td>${rowActions(x.id,'edit-ledger','delete-ledger')}</td>`:''}</tr>`).join('');
@@ -162,7 +175,7 @@ function payrollPage() {
   return `<div class="grid sm:grid-cols-3 gap-4 mb-6">${statCard('Wages recorded',money(total),'Total wage payments recorded','wallet')}${statCard('Wages to pay',money(pending),'Wage payments still pending','clock-3')}${statCard('Payment records',state.ledger.length,'Wages, advances and adjustments','receipt')}</div>${sectionHead('Worker payments','Wage payments, advances and site expenses',isAdmin()?'<button class="btn-primary" data-action="add-payment">+ Record payment</button>':'')}<div class="card overflow-hidden">${state.ledger.length?table(['Worker','Payment type','Date','Payment details','Amount','Status','Voucher / receipt no.',...(isAdmin()?['Actions']:[])],rows):empty('No payment records')}</div><p class="text-[11px] text-slate-500 mt-3">Check attendance and any advances paid before settling a worker’s wages.</p>`;
 }
 function projectsPage() {
-  const rows=state.projects.map(p=>`<tr><td><div class="font-semibold">${esc(p.name)}</div><div class="text-[10px] text-slate-400 mt-1">${esc(p.project_code||'No code')}</div></td><td>${esc(p.location||'—')}</td><td>${status(p.status||'active')}</td><td>${state.assignments.filter(a=>a.project_id===p.id).length} assigned</td><td>${niceDate(p.start_date)}</td>${isChair()?`<td>${rowActions(p.id,'edit-project','delete-project')}</td>`:''}</tr>`).join('');
+  const rows=state.projects.map(p=>`<tr><td><div class="font-semibold">${esc(p.name)}</div><div class="text-[10px] text-slate-400 mt-1">${esc(p.project_code||'No code')}</div></td><td>${esc(p.location||'—')}</td><td>${status(p.status||'active')}</td><td>${state.assignments.filter(a=>a.project_id===p.id&&!a.unassigned_at).length} assigned</td><td>${niceDate(p.start_date)}</td>${isChair()?`<td>${rowActions(p.id,'edit-project','delete-project')}</td>`:''}</tr>`).join('');
   return `${sectionHead('Projects & sites','Site directory and workforce deployment',isChair()?'<button class="btn-primary" data-action="add-project">+ Add project</button>':'')}<div class="card overflow-hidden">${state.projects.length?table(['Project','Location','Status','Workers assigned','Start date',...(isChair()?['Actions']:[])],rows):empty('No projects created')}</div>`;
 }
 function workerPortal() {
@@ -170,9 +183,14 @@ function workerPortal() {
   if(!worker) return `<div class="card p-8">${empty('Your worker profile is not linked yet')}<p class="text-xs text-center text-slate-500">Ask your administrator to link your login to your worker profile.</p></div>`;
   const att=state.attendance.filter(a=>a.worker_id===worker.id);
   const ledger=state.ledger.filter(x=>x.worker_id===worker.id);
-  const wages=ledger.filter(x=>x.entry_type==='wage');
   const advances=ledger.filter(x=>x.entry_type==='advance').reduce((s,x)=>s+Number(x.amount||0),0);
-
+  const creditedDays=att.reduce((total,a)=>total+attendanceDayCredit(a.status),0);
+  const attendanceWages=att.reduce((total,a)=>total+Number(a.wage_amount||0),0);
+  const recentAttendance=att.slice(0,20).map(a=>`<tr><td>${niceDate(a.work_date)}</td><td>${esc(a.projects?.name||'—')}</td><td>${status(a.status)}</td><td>${attendanceDayCredit(a.status).toFixed(1)} day</td><td>${Number(a.overtime_hours||0).toFixed(1)} h</td><td class="mono">${money(a.wage_amount)}</td></tr>`).join('');
+  return `<div class="flex flex-wrap items-center justify-between gap-3 mb-6"><div><div class="eyebrow">MY WORKFORCE RECORD</div><p class="text-sm text-slate-500 mt-1">Your attendance, calculated wages and payment history.</p></div><button class="btn-secondary" data-action="refresh">${icon('refresh-cw')} Refresh data</button></div>
+  <div class="grid sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">${statCard('Attendance records',att.length,'Recorded shifts','calendar-check')}${statCard('Credited days',creditedDays.toFixed(1),'Present = 1 day · Half-day = 0.5','check')}${statCard('Calculated wages',money(attendanceWages),'Earned from recorded attendance','wallet')}${statCard('Advances received',money(advances),'All recorded advances','hand-coins')}</div>
+  <div class="card overflow-hidden mb-6">${sectionHead('My attendance','Latest shifts with site, status, credited days and calculated wages')}${att.length?table(['Work date','Site','Shift status','Credited days','Overtime','Calculated wage'],recentAttendance):empty('No attendance entries yet')}</div>
+  <div class="card overflow-hidden">${sectionHead('My payments','Recorded wage payments and advances')}${ledger.length?table(['Payment type','Date','Details','Amount','Status'],ledger.map(x=>`<tr><td>${esc(paymentType(x.entry_type))}</td><td>${niceDate(x.transaction_date)}</td><td>${esc(x.description||x.receipt_reference||'—')}</td><td class="mono">${money(x.amount)}</td><td>${status(x.status||'pending')}</td></tr>`).join('')):empty('No payment records yet')}</div>`;
 }
 function modal(title, subtitle, body) {
   $('#modalContent').innerHTML=`<div class="modal-inner"><div class="flex justify-between gap-4 items-start mb-6"><div><div class="eyebrow">RSPL ATTENDANCE</div><h3 id="modalTitle" class="text-xl font-bold mt-2">${title}</h3><p id="modalSubtitle" class="text-xs text-slate-500 mt-1">${subtitle}</p></div><button class="icon-button" data-action="close-modal" aria-label="Close">${icon('x')}</button></div>${body}</div>`;
@@ -206,10 +224,21 @@ function settleConfirmation(confirmed) {
   if($('#modal').open) $('#modal').close();
 }
 function options(items, labelKey='name', selectedId='') { return items.map(x=>`<option value="${esc(x.id)}" ${String(x.id)===String(selectedId)?'selected':''}>${esc(x[labelKey])}</option>`).join(''); }
+function currentSiteAssignment(worker) {
+  return (worker.site_assignments||[])
+    .filter(assignment=>!assignment.unassigned_at)
+    .sort((a,b)=>new Date(b.assigned_at||0)-new Date(a.assigned_at||0))[0];
+}
+function assignedProjects(workerId) {
+  const assignedProjectIds=new Set(state.assignments
+    .filter(assignment=>assignment.worker_id===workerId&&!assignment.unassigned_at)
+    .map(assignment=>assignment.project_id));
+  return state.projects.filter(project=>assignedProjectIds.has(project.id));
+}
 function workerModal(id=null) {
   if(!isAdmin()) return;
-  const worker=state.workers.find(w=>w.id===id), editing=Boolean(worker), value=(key)=>esc(worker?.[key]??'');
-  modal(editing?'Edit worker':'Register worker',editing?'Update worker profile, trade, wage and status.':'Fields marked * are required. Sensitive identity documents are stored privately.',`<form id="workerForm" class="grid sm:grid-cols-2 gap-4">
+  const worker=state.workers.find(w=>w.id===id), editing=Boolean(worker), value=(key)=>esc(worker?.[key]??''), assignment=worker?currentSiteAssignment(worker):null;
+  modal(editing?'Edit worker':'Register worker',editing?'Update the worker’s complete profile and current site assignment.':'Fields marked * are required. Sensitive identity documents are stored privately.',`<form id="workerForm" class="grid sm:grid-cols-2 gap-4">
     ${editing?`<input type="hidden" name="record_id" value="${esc(worker.id)}">`:''}
     <label class="field-label sm:col-span-2">Full name *<input class="field" name="full_name" required maxlength="120" value="${value('full_name')}"></label>
     <label class="field-label">Phone<input class="field" name="phone" type="tel" maxlength="20" value="${value('phone')}"></label>
@@ -217,18 +246,22 @@ function workerModal(id=null) {
     <label class="field-label">Government ID number<input class="field" name="govt_id_number" maxlength="40" autocomplete="off" value="${value('govt_id_number')}"></label>
     <label class="field-label">Trade *<select class="field" name="trade_type" required>${['helper','mason','carpenter','electrician','plumber','welder','painter','operator','other'].map(t=>`<option value="${t}" ${worker?.trade_type===t?'selected':''}>${esc(titleCase(t))}</option>`).join('')}</select></label>
     <label class="field-label">Daily wage rate (₹) *<input class="field" name="daily_wage_rate" type="number" min="0" max="1000000" step=".01" required value="${value('daily_wage_rate')}"></label>
-    ${editing?`<label class="field-label">Status<select class="field" name="status">${['active','inactive'].map(s=>`<option value="${s}" ${worker.status===s?'selected':''}>${titleCase(s)}</option>`).join('')}</select></label>`:`<label class="field-label">Project site<select class="field" name="project_id"><option value="">Unassigned</option>${options(state.projects)}</select></label>
+    ${editing?`<label class="field-label">Status<select class="field" name="status">${['active','inactive','on_leave'].map(s=>`<option value="${s}" ${worker.status===s?'selected':''}>${titleCase(s.replaceAll('_',' '))}</option>`).join('')}</select></label>`:''}
+    <label class="field-label">Project site<select class="field" name="project_id"><option value="">Unassigned</option>${options(state.projects,'name',assignment?.project_id)}</select></label>
     <label class="field-label sm:col-span-2">Profile image (compressed before upload)<input class="field" name="avatar" type="file" accept="image/png,image/jpeg,image/webp"></label>
-    <label class="field-label sm:col-span-2">ID proof document (images compressed; PDFs unchanged)<input class="field" name="id_proof" type="file" accept="image/png,image/jpeg,image/webp,application/pdf"></label>`}
+    <label class="field-label sm:col-span-2">ID proof document (images compressed; PDFs unchanged)<input class="field" name="id_proof" type="file" accept="image/png,image/jpeg,image/webp,application/pdf"></label>
     <div class="sm:col-span-2 flex justify-end gap-2 pt-3"><button type="button" class="btn-secondary" data-action="close-modal">Cancel</button><button class="btn-primary" type="submit">${editing?'Save changes':'Save worker'}</button></div>
   </form>`);
 }
 function addWorkerModal() { workerModal(); }
 function attendanceModal() {
   if(!isAdmin()) return;
+  const workers=state.workers
+    .filter(worker=>worker.status!=='inactive'&&assignedProjects(worker.id).length)
+    .sort((a,b)=>a.full_name.localeCompare(b.full_name));
   modal('Mark attendance','Record one worker shift. Wage is calculated from the configured status and rate.',`<form id="attendanceForm" class="grid sm:grid-cols-2 gap-4">
-    <label class="field-label sm:col-span-2">Worker *<select class="field" name="worker_id" required><option value="">Choose worker</option>${options(state.workers.filter(w=>w.status!=='inactive'))}</select></label>
-    <label class="field-label">Project site *<select class="field" name="project_id" required><option value="">Choose site</option>${options(state.projects)}</select></label>
+    <label class="field-label sm:col-span-2">Worker *<select class="field" name="worker_id" required><option value="">${workers.length?'Choose worker':'No active workers have an assigned site'}</option>${options(workers,'full_name')}</select></label>
+    <label class="field-label">Project site *<select class="field" name="project_id" required disabled><option value="">Choose a worker first</option></select></label>
     <label class="field-label">Work date *<input class="field" type="date" name="work_date" value="${dateISO()}" required max="${dateISO()}"></label>
     <label class="field-label">Attendance status *<select class="field" name="status" required><option value="present">Present (1 day)</option><option value="absent">Absent (0 day)</option><option value="half_day">Half-day (0.5 day)</option><option value="overtime">Present + overtime</option></select></label>
     <label class="field-label">Overtime hours<input class="field" type="number" name="overtime_hours" min="0" max="24" step=".25" value="0"></label>
@@ -298,9 +331,10 @@ async function compressImage(file, maxBytes) {
   }
 }
 async function uploadFile(file, workerId, kind) {
-  if(!file) return null;
+  if(!file||!file.name) return null;
   const allowed = kind==='id_proof' ? ['application/pdf','image/jpeg','image/png','image/webp'] : ['image/jpeg','image/png','image/webp'];
   const fileLabel=kind==='avatar'?'Profile image':'ID proof document';
+  if(file.size===0) throw new Error(`${fileLabel} is empty.`);
   if(!allowed.includes(file.type)) throw new Error(`Unsupported ${fileLabel.toLowerCase()} file type.`);
   const max=kind==='id_proof'?8*1024*1024:4*1024*1024;
   const isImage=file.type.startsWith('image/');
@@ -319,32 +353,61 @@ async function submitWorker(form) {
   const recordId=fd.get('record_id');
   const payload={full_name:String(fd.get('full_name')).trim(),phone:String(fd.get('phone')||'').trim()||null,emergency_contact:String(fd.get('emergency_contact')||'').trim()||null,govt_id_number:String(fd.get('govt_id_number')||'').trim()||null,trade_type:fd.get('trade_type'),daily_wage_rate:wage,status:recordId?fd.get('status'):'active'};
   if(!payload.full_name) throw new Error('Full name is required.');
+  if(recordId&&!isAdmin()) throw new Error('You do not have permission to edit workers.');
+  let workerId=recordId;
   if(recordId) {
-    if(!isAdmin()) throw new Error('You do not have permission to edit workers.');
     const {error}=await supabase.from('workers').update(payload).eq('id',recordId);
     if(error) throw error;
-    $('#modal').close(); await loadData(); render(); notify('Worker profile updated.');
-    return;
+  } else {
+    payload.created_by=state.user.id;
+    const {data:worker,error}=await supabase.from('workers').insert(payload).select().single();
+    if(error) throw error;
+    workerId=worker.id;
   }
-  payload.created_by=state.user.id;
-  const {data:worker,error}=await supabase.from('workers').insert(payload).select().single();
-  if(error) throw error;
   try {
-    const avatarPath=await uploadFile(fd.get('avatar'),worker.id,'avatar');
-    const idPath=await uploadFile(fd.get('id_proof'),worker.id,'id_proof');
-    if(avatarPath||idPath) { const {error:e}=await supabase.from('workers').update({avatar_path:avatarPath,id_proof_path:idPath}).eq('id',worker.id); if(e) throw e; }
-    const projectId=fd.get('project_id');
-    if(projectId) { const {error:e}=await supabase.from('site_assignments').insert({worker_id:worker.id,project_id:projectId,assigned_by:state.user.id}); if(e) throw e; }
+    const avatarPath=await uploadFile(fd.get('avatar'),workerId,'avatar');
+    const idPath=await uploadFile(fd.get('id_proof'),workerId,'id_proof');
+    const mediaPayload={};
+    if(avatarPath) mediaPayload.avatar_path=avatarPath;
+    if(idPath) mediaPayload.id_proof_path=idPath;
+    if(Object.keys(mediaPayload).length) {
+      const {error}=await supabase.from('workers').update(mediaPayload).eq('id',workerId);
+      if(error) throw error;
+    }
+    await saveWorkerSiteAssignment(workerId,fd.get('project_id'));
   } catch(e) {
     await loadData(); $('#modal').close(); render();
-    notify(`Worker profile created, but a file or site assignment step failed: ${e.message}`,true);
+    notify(`Worker profile ${recordId?'updated':'created'}, but a file or site assignment step failed: ${e.message}`,true);
     return;
   }
-  await loadData(); $('#modal').close(); render(); notify('Worker profile created.');
+  await loadData(); $('#modal').close(); render(); notify(`Worker profile ${recordId?'updated':'created'}.`);
+}
+async function saveWorkerSiteAssignment(workerId, projectId) {
+  const {data:activeAssignments,error}=await supabase.from('site_assignments')
+    .select('id, project_id')
+    .eq('worker_id',workerId)
+    .is('unassigned_at',null);
+  if(error) throw error;
+  if(activeAssignments.length===1&&activeAssignments[0].project_id===projectId) return;
+  if(projectId) {
+    const {error:insertError}=await supabase.from('site_assignments').insert({
+      worker_id:workerId,
+      project_id:projectId,
+      assigned_by:state.user.id
+    });
+    if(insertError) throw insertError;
+  }
+  if(activeAssignments.length) {
+    const {error:updateError}=await supabase.from('site_assignments')
+      .update({unassigned_at:new Date().toISOString()})
+      .in('id',activeAssignments.map(assignment=>assignment.id));
+    if(updateError) throw updateError;
+  }
 }
 async function submitAttendance(form) {
   const fd=new FormData(form), worker=state.workers.find(w=>w.id===fd.get('worker_id'));
   if(!worker) throw new Error('Choose a valid worker.');
+  if(!assignedProjects(worker.id).some(project=>project.id===fd.get('project_id'))) throw new Error('Choose a site assigned to this worker.');
   const statusValue=fd.get('status'), ot=Number(fd.get('overtime_hours')||0);
   if(ot<0||ot>24) throw new Error('Overtime must be between 0 and 24 hours.');
   const dayFactor={present:1,absent:0,half_day:.5,overtime:1}[statusValue];
@@ -411,7 +474,10 @@ async function workerDetail(id) {
   const w=state.workers.find(x=>x.id===id); if(!w)return;
   const att=state.attendance.filter(a=>a.worker_id===id);
   const ledger=state.ledger.filter(x=>x.worker_id===id);
-  modal(esc(w.full_name),'Worker profile and recent activity',`<div class="grid grid-cols-2 gap-3"><div class="rounded-xl bg-slate-50 p-4"><div class="text-xs text-slate-500">Trade</div><b class="block mt-1">${esc(w.trade_type)}</b></div><div class="rounded-xl bg-slate-50 p-4"><div class="text-xs text-slate-500">Daily wage</div><b class="block mt-1 mono">${money(w.daily_wage_rate)}</b></div><div class="rounded-xl bg-slate-50 p-4"><div class="text-xs text-slate-500">Phone</div><b class="block mt-1">${esc(w.phone||'—')}</b></div><div class="rounded-xl bg-slate-50 p-4"><div class="text-xs text-slate-500">Status</div><div class="mt-1">${status(w.status)}</div></div></div><div class="mt-5"><h4 class="font-bold text-sm mb-2">Recent attendance (${att.length})</h4>${att.slice(0,5).map(a=>`<div class="flex justify-between border-t py-2 text-xs"><span>${niceDate(a.work_date)} · ${esc(a.projects?.name||'—')}</span>${status(a.status)}</div>`).join('')||'<p class="text-xs text-slate-500">No attendance yet.</p>'}</div><div class="mt-5"><h4 class="font-bold text-sm mb-2">Recent payments (${ledger.length})</h4>${ledger.slice(0,5).map(x=>`<div class="flex justify-between border-t py-2 text-xs"><span>${niceDate(x.transaction_date)} · ${esc(paymentType(x.entry_type))}</span><b class="mono">${money(x.amount)}</b></div>`).join('')||'<p class="text-xs text-slate-500">No payment records yet.</p>'}</div>`);
+  const creditedDays=att.reduce((total,a)=>total+attendanceDayCredit(a.status),0);
+  const attendanceWages=att.reduce((total,a)=>total+Number(a.wage_amount||0),0);
+  const attendanceRows=att.slice(0,10).map(a=>`<tr><td>${niceDate(a.work_date)}</td><td>${esc(a.projects?.name||'—')}</td><td>${status(a.status)}</td><td>${attendanceDayCredit(a.status).toFixed(1)} day</td><td>${Number(a.overtime_hours||0).toFixed(1)} h</td><td class="mono">${money(a.wage_amount)}</td></tr>`).join('');
+  modal(esc(w.full_name),'Worker profile and attendance history',`<div class="grid grid-cols-2 gap-3"><div class="rounded-xl bg-slate-50 p-4"><div class="text-xs text-slate-500">Trade</div><b class="block mt-1">${esc(titleCase(w.trade_type||'helper'))}</b></div><div class="rounded-xl bg-slate-50 p-4"><div class="text-xs text-slate-500">Daily wage</div><b class="block mt-1 mono">${money(w.daily_wage_rate)}</b></div><div class="rounded-xl bg-slate-50 p-4"><div class="text-xs text-slate-500">Phone</div><b class="block mt-1">${esc(w.phone||'—')}</b></div><div class="rounded-xl bg-slate-50 p-4"><div class="text-xs text-slate-500">Status</div><div class="mt-1">${status(w.status)}</div></div></div><div class="grid grid-cols-3 gap-3 mt-5"><div class="rounded-xl bg-slate-50 p-3"><div class="text-[11px] text-slate-500">Attendance records</div><b class="block mt-1">${att.length}</b></div><div class="rounded-xl bg-slate-50 p-3"><div class="text-[11px] text-slate-500">Credited days</div><b class="block mt-1">${creditedDays.toFixed(1)}</b></div><div class="rounded-xl bg-slate-50 p-3"><div class="text-[11px] text-slate-500">Calculated wages</div><b class="block mt-1 mono">${money(attendanceWages)}</b></div></div><div class="mt-5"><h4 class="font-bold text-sm mb-2">Recent attendance</h4>${att.length?table(['Date','Site','Status','Credited days','Overtime','Wage'],attendanceRows):'<p class="text-xs text-slate-500">No attendance yet.</p>'}</div><div class="mt-5"><h4 class="font-bold text-sm mb-2">Recent payments (${ledger.length})</h4>${ledger.slice(0,5).map(x=>`<div class="flex justify-between border-t py-2 text-xs"><span>${niceDate(x.transaction_date)} · ${esc(paymentType(x.entry_type))}</span><b class="mono">${money(x.amount)}</b></div>`).join('')||'<p class="text-xs text-slate-500">No payment records yet.</p>'}</div>`);
 }
 document.addEventListener('click', async e=>{
   const page=e.target.closest('[data-page]'); if(page){setPage(page.dataset.page); if(innerWidth<1024)setSidebarOpen(false);return;}
@@ -436,6 +502,19 @@ document.addEventListener('click', async e=>{
       case 'worker-detail':await workerDetail(el.dataset.id);break;
     }
   } catch(err) { notify(err.message||'Something went wrong.',true); }
+});
+document.addEventListener('change',e=>{
+  if(e.target.id==='attendanceWorkerFilter') {
+    state.attendanceWorkerFilter=e.target.value;
+    render();
+    return;
+  }
+  if(e.target.matches('#attendanceForm [name="worker_id"]')) {
+    const projectSelect=$('#attendanceForm [name="project_id"]');
+    const projects=assignedProjects(e.target.value);
+    projectSelect.innerHTML=`<option value="">${projects.length?'Choose site':'No sites assigned'}</option>${options(projects)}`;
+    projectSelect.disabled=projects.length===0;
+  }
 });
 document.addEventListener('submit', async e=>{
   const f=e.target;
