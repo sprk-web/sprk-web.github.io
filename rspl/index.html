@@ -15,11 +15,18 @@
   <link rel="stylesheet" href="./styles.css" />
 </head>
 <body class="bg-canvas text-slate-900">
-  <div id="loginView" class="min-h-screen grid lg:grid-cols-2">
+  <div id="splashView" class="splash-screen" role="status" aria-live="polite">
+    <div class="splash-brand">
+      <div class="brand-mark"><img src="./assets/rspl-logo.jpeg" alt=""></div>
+      <div class="splash-name">RSPL Attendance</div>
+      <div class="splash-loader" aria-hidden="true"><span></span></div>
+    </div>
+  </div>
+  <div id="loginView" class="hidden min-h-screen grid lg:grid-cols-2">
     <section class="hidden lg:flex flex-col justify-between bg-ink p-12 text-white relative overflow-hidden">
       <div class="absolute -right-20 -bottom-20 h-96 w-96 rounded-full border border-white/10"></div>
       <div class="absolute -right-8 -bottom-8 h-72 w-72 rounded-full border border-white/10"></div>
-      <div class="flex items-center gap-3 relative"><div class="brand-mark"><img src="https://imgs.search.brave.com/C1QQUi6sNUog-PavJvShU27nvwC1ptMOsfmUMiQ5Hz8/rs:fit:500:0:1:0/g:ce/aHR0cHM6Ly9tZWRpYS5nZXR0eWltYWdl/cy5jb20vaWQvMTYy/NTIxNzc3Ni9waG90/by9hYnN0cmFjdC1n/cmFkaWVudC1iYWNr/Z3JvdW5kLXdpdGgt/ZGVsaWNhdGUtd2F2/ZXMuanBnP3M9NjEy/eDYxMiZ3PTAmaz0y/MCZjPXE4a0VNWTRy/NTh1cEFyb1YxVTlx/QjJrejdTa2ZqTGZi/QXplUGVjMnV2Tkk9" alt="RSPL logo"></div><div><div class="font-bold tracking-tight text-xl">RSPL Attendance</div><div class="text-xs text-slate-400">WORKFORCE OPERATIONS</div></div></div>
+      <div class="flex items-center gap-3 relative"><div class="brand-mark"><img src="./assets/rspl-logo.jpeg" alt="RSPL logo"></div><div><div class="font-bold tracking-tight text-xl">RSPL Attendance</div><div class="text-xs text-slate-400">WORKFORCE OPERATIONS</div></div></div>
       <div class="max-w-xl relative">
         <div class="text-safety text-xs font-bold tracking-[.2em] uppercase mb-5">Built for the ground up</div>
         <h1 class="text-5xl font-semibold leading-tight tracking-tight">Every site.<br>Every shift.<br><span class="text-slate-400">Accounted for.</span></h1>
@@ -29,13 +36,14 @@
     </section>
     <section class="flex items-center justify-center p-6 sm:p-12">
       <div class="w-full max-w-md">
-        <div class="lg:hidden flex items-center gap-3 mb-12"><div class="brand-mark"><img src="https://raw.githubusercontent.com/sprk-web/sprk-web.github.io/refs/heads/main/images/spark.jpeg" alt="RSPL logo"></div><div class="font-bold text-xl">RSPL Attendance</div></div>
+        <div class="lg:hidden flex items-center gap-3 mb-12"><div class="brand-mark"><img src="./assets/rspl-logo.jpeg" alt="RSPL logo"></div><div class="font-bold text-xl">RSPL Attendance</div></div>
         <div class="eyebrow">SECURE WORKSPACE</div>
         <h2 class="text-3xl font-bold tracking-tight mt-2">Welcome back</h2>
         <p class="text-slate-500 mt-2 mb-8">Sign in to access your workforce dashboard.</p>
         <form id="loginForm" class="space-y-5">
           <label class="field-label">Email address<input id="email" type="email" autocomplete="username" required class="field" placeholder="you@company.com"></label>
           <label class="field-label">Password<input id="password" type="password" autocomplete="current-password" required class="field" placeholder="Enter your password"></label>
+          <label class="remember-option"><input id="rememberMe" type="checkbox"><span>Remember me</span><small>Stay signed in on this device</small></label>
           <button class="btn-primary w-full" type="submit"><span>Sign in securely</span><i data-lucide="arrow-up-right"></i></button>
           <p id="loginError" class="text-sm text-red-600" role="alert"></p>
         </form>
@@ -46,7 +54,7 @@
 
   <div id="appView" class="hidden min-h-screen">
     <aside id="sidebar" class="sidebar" aria-label="Workspace navigation" aria-hidden="true" inert>
-      <div class="flex items-center justify-between gap-3 px-5 py-6"><div class="flex items-center gap-3"><div class="brand-mark"><img src="https://imgs.search.brave.com/C1QQUi6sNUog-PavJvShU27nvwC1ptMOsfmUMiQ5Hz8/rs:fit:500:0:1:0/g:ce/aHR0cHM6Ly9tZWRpYS5nZXR0eWltYWdlcy5jb20vaWQvMTYy/NTIxNzc3Ni9waG90/by9hYnN0cmFjdC1n/cmFkaWVudC1iYWNr/Z3JvdW5kLXdpdGgtZGVsaWNhdGUtd2F2ZXMuanBnP3M9NjEy/eDYxMiZ3PTAmaz0y/MCZjPXE4a0VNWTRyNTh1cEFyb1YxVTlxQjJrejdTa2ZqTGZiQXplUGVjMnV2Tkk9" alt="RSPL logo"></div><div><div class="font-bold text-white tracking-tight">RSPL Attendance</div></div></div><button id="sidebarClose" class="sidebar-close" type="button" aria-label="Close navigation"><i data-lucide="x"></i></button></div>
+      <div class="flex items-center justify-between gap-3 px-5 py-6"><div class="flex items-center gap-3"><div class="brand-mark"><img src="./assets/rspl-logo.jpeg" alt="RSPL logo"></div><div><div class="font-bold text-white tracking-tight">RSPL Attendance</div></div></div><button id="sidebarClose" class="sidebar-close" type="button" aria-label="Close navigation"><i data-lucide="x"></i></button></div>
       <div class="sidebar-label">WORKSPACE</div>
       <nav id="nav" class="space-y-1 px-3">
         <button data-page="overview" class="nav-item active"><i data-lucide="layout-dashboard"></i>Overview</button>

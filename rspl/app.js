@@ -1,28 +1,23 @@
-import { supabase } from './supabase-client.js';
+import { isRememberSessionEnabled, setRememberSessionEnabled, supabase } from './supabase-client.js';
 
 const $ = (s, root=document) => root.querySelector(s);
 const $$ = (s, root=document) => [...root.querySelectorAll(s)];
-const brandLogoUrl = 'https://imgs.search.brave.com/C1QQUi6sNUog-PavJvShU27nvwC1ptMOsfmUMiQ5Hz8/rs:fit:500:0:1:0/g:ce/aHR0cHM6Ly9tZWRp/YS5nZXR0eWltYWdl/cy5jb20vaWQvMTYy/NTIxNzc3Ni9waG90/by9hYnN0cmFjdC1n/cmFkaWVudC1iYWNr/Z3JvdW5kLXdpdGgtZGVsaWNhdGUtd2F2ZXMuanBnP3M9NjEy/eDYxMiZ3PTAmaz0y/MCZjPXE4a0VNWTRyNTh1cEFyb1YxVTlxQjJrejdTa2ZqTGZiQXplUGVjMnV2Tkk9';
-$$('.brand-mark img').forEach(image => {
-  image.addEventListener('error',()=>{
-    const mark=image.parentElement;
-    image.remove();
-    mark.classList.add('brand-fallback');
-    mark.textContent='RSPL';
-  },{once:true});
-  image.src=brandLogoUrl;
-});
 const state = { user:null, profile:null, page:'overview', projects:[], workers:[], attendance:[], ledger:[], assignments:[] };
 let pendingConfirmation = null;
+const splashStartedAt = Date.now();
 const money = n => new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR',maximumFractionDigits:0}).format(Number(n||0));
-const dateISO = () => new Date().toLocaleDateString('en-CA');
+const dateISO = () => {
+  const date=new Date();
+  return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
+};
 const niceDate = d => d ? new Date(`${d}T00:00:00`).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}) : '—';
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const initials = s => (s||'RS').split(/\s+/).slice(0,2).map(x=>x[0]).join('').toUpperCase();
 const status = s => `<span class="status ${esc(String(s||'neutral').toLowerCase())}">${esc(String(s||'—').replaceAll('_',' '))}</span>`;
 const isChair = () => state.profile?.role === 'chairman';
 const isAdmin = () => ['chairman','admin'].includes(state.profile?.role);
-const notify = (msg, bad=false) => { const n=$('#notice'); n.textContent=msg; n.classList.remove('hidden'); n.style.background=bad?'#fef2f2':'#eff6ff'; n.style.color=bad?'#b91c1c':'#1d4ed8'; setTimeout(()=>n.classList.add('hidden'),4500); };
+let noticeTimeout;
+const notify = (msg, bad=false) => { const n=$('#notice'); n.textContent=msg; n.classList.remove('hidden'); n.style.background=bad?'#fef2f2':'#eff6ff'; n.style.color=bad?'#b91c1c':'#1d4ed8'; clearTimeout(noticeTimeout); noticeTimeout=setTimeout(()=>n.classList.add('hidden'),4500); };
 const icon = name => `<i data-lucide="${name}"></i>`;
 const refreshIcons = () => window.lucide?.createIcons();
 function setSidebarOpen(open) {
@@ -47,6 +42,7 @@ function toggleSidebar() {
 }
 
 $('#year').textContent = new Date().getFullYear();
+$('#rememberMe').checked = isRememberSessionEnabled();
 
 async function boot() {
   try {
@@ -57,6 +53,10 @@ async function boot() {
   } catch (error) {
     console.error('Could not restore the Supabase session:', error);
     showLogin(`Could not restore your session: ${error.message || 'Check your Supabase connection and configuration.'}`);
+  } finally {
+    const remainingSplashTime = Math.max(0, 2000 - (Date.now() - splashStartedAt));
+    await new Promise(resolve => setTimeout(resolve, remainingSplashTime));
+    $('#splashView').classList.add('hidden');
   }
   supabase.auth.onAuthStateChange((_event, session) => {
     if (session && !state.user) setTimeout(()=>{
@@ -443,7 +443,12 @@ document.addEventListener('submit', async e=>{
   e.preventDefault();
   const button=f.querySelector('button[type="submit"]'); if(button){button.disabled=true;button.textContent='Saving…';}
   try {
-    if(f.id==='loginForm') { $('#loginError').textContent=''; const {error}=await supabase.auth.signInWithPassword({email:$('#email').value.trim(),password:$('#password').value}); if(error)throw error; }
+    if(f.id==='loginForm') {
+      $('#loginError').textContent='';
+      setRememberSessionEnabled($('#rememberMe').checked);
+      const {error}=await supabase.auth.signInWithPassword({email:$('#email').value.trim(),password:$('#password').value});
+      if(error)throw error;
+    }
     if(f.id==='workerForm')await submitWorker(f);
     if(f.id==='attendanceForm')await submitAttendance(f);
     if(f.id==='paymentForm')await submitPayment(f);
@@ -460,7 +465,20 @@ document.addEventListener('submit', async e=>{
     }
   }
 });
-$('#logoutBtn').addEventListener('click',async()=>{await supabase.auth.signOut();showLogin();});
+$('#logoutBtn').addEventListener('click',async()=>{
+  const button=$('#logoutBtn');
+  button.disabled=true;
+  try {
+    const {error}=await supabase.auth.signOut();
+    if(error) throw error;
+    showLogin();
+  } catch(error) {
+    console.error('Could not sign out:',error);
+    notify(`Could not sign out: ${error.message||'Please try again.'}`,true);
+  } finally {
+    button.disabled=false;
+  }
+});
 $('#mobileMenu').addEventListener('click',toggleSidebar);
 $('#sidebarToggle').addEventListener('click',toggleSidebar);
 $('#sidebarClose').addEventListener('click',()=>setSidebarOpen(false));
