@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#ffffff">
+  <title>Page not found - SPRK-Web</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <link rel="stylesheet" href="theme.css">
+  <style>
+    .not-found-main {
+      display: grid;
+      min-height: calc(100vh - 64px);
+      place-items: center;
+      padding: 32px 24px;
+    }
+
+    .not-found-card {
+      width: min(620px, 100%);
+      padding: clamp(24px, 4vw, 36px);
+      border: 1px solid var(--line);
+      border-radius: var(--app-radius, 18px);
+      background: var(--surface);
+      box-shadow: var(--app-shadow);
+      text-align: center;
+    }
+
+    .not-found-art {
+      position: relative;
+      display: grid;
+      width: 112px;
+      height: 112px;
+      margin: 0 auto 18px;
+      place-items: center;
+      border-radius: 50%;
+      background: color-mix(in srgb, var(--app-accent, #2563eb) 9%, var(--surface));
+      color: var(--app-accent, #2563eb);
+    }
+
+    .not-found-art::before,
+    .not-found-art::after {
+      position: absolute;
+      border: 1px solid color-mix(in srgb, var(--app-accent, #2563eb) 30%, transparent);
+      border-radius: 50%;
+      content: "";
+    }
+
+    .not-found-art::before {
+      inset: -12px;
+    }
+
+    .not-found-art::after {
+      inset: 14px;
+    }
+
+    .not-found-code {
+      margin: 0;
+      color: var(--app-accent, #2563eb);
+      font-size: clamp(4rem, 14vw, 6rem);
+      font-weight: 800;
+      letter-spacing: -.09em;
+      line-height: 1;
+    }
+
+    .not-found-title {
+      margin: 18px 0 10px;
+      color: var(--ink);
+      font-size: clamp(1.5rem, 5vw, 2rem);
+      font-weight: 700;
+      letter-spacing: -.04em;
+    }
+
+    .not-found-copy {
+      max-width: 390px;
+      margin: 0 auto 26px;
+      color: var(--muted);
+      line-height: 1.65;
+    }
+
+    .not-found-link {
+      display: inline-flex;
+      min-height: 46px;
+      align-items: center;
+      justify-content: center;
+      gap: 9px;
+      padding: 0 20px;
+      border-radius: 999px;
+      background: var(--app-accent, #2563eb);
+      color: #fff;
+      font-weight: 650;
+      text-decoration: none;
+      transition: transform 160ms ease, filter 160ms ease;
+    }
+
+    .not-found-link:hover {
+      filter: brightness(.92);
+      transform: translateY(-2px);
+    }
+
+    .not-found-link:focus-visible {
+      outline: 3px solid color-mix(in srgb, var(--app-accent, #2563eb) 40%, transparent);
+      outline-offset: 3px;
+    }
+
+    @media (max-width: 620px) {
+      .not-found-main {
+        min-height: calc(100vh - 56px);
+        padding: 30px 16px 100px;
+      }
+    }
+  </style>
+</head>
+<body data-page="notFound" class="m-0 min-h-screen">
+  <main class="not-found-main">
+    <section class="not-found-card" aria-labelledby="not-found-title">
+      <div class="not-found-art" aria-hidden="true">
+        <i data-lucide="compass" class="h-14 w-14"></i>
+      </div>
+      <p class="not-found-code" aria-label="Error 404">404</p>
+      <h1 id="not-found-title" class="not-found-title">Looks like you’re off the map.</h1>
+      <p class="not-found-copy">The page you’re looking for may have moved or no longer exists. Let’s get you back to your learning space.</p>
+      <a class="not-found-link" href="index.html">
+        <i data-lucide="arrow-left" class="h-4 w-4" aria-hidden="true"></i>
+        Back to home
+      </a>
+    </section>
+  </main>
+  <script type="module" src="js/shell.js"></script>
+  <script type="module" src="js/theme.js"></script>
+</body>
+</html>

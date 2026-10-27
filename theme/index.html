@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#ffffff">
+  <title>Theme &amp; personalization - SPRK WEB</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>  
+  <link rel="stylesheet" href="../theme.css">
+</head>
+<body data-page="theme" class="m-0 min-h-screen min-w-[320px] bg-white font-sans text-[#0f0f0f]">
+  <main class="px-8 py-10 max-[620px]:px-4 max-[620px]:py-6" aria-label="Theme settings">
+    <div class="theme-settings-layout mx-auto max-w-4xl">
+
+      <section class="theme-intro" aria-labelledby="theme-heading">
+        <div class="theme-intro-copy">
+          <p>PERSONALIZE YOUR SPACE</p>
+          <h1 id="theme-heading">Make SPRK feel like yours.</h1>
+          <p>Fine-tune colors, type, and interface details. Your choices are saved on this device.</p>
+        </div>
+        <div class="theme-intro-actions">
+          <button id="reset-theme" class="theme-reset-button" type="button">Reset to defaults</button>
+          <output id="theme-save-status" class="theme-save-status" role="status" aria-live="polite">Changes save on this device</output>
+        </div>
+      </section>
+
+      <section class="theme-presets-section" aria-labelledby="presets-heading">
+        <div class="theme-presets-heading">
+          <div><h2 id="presets-heading">Quick styles</h2><p>Start with a look, then fine-tune every detail.</p></div>
+        </div>
+        <div class="theme-presets-grid" role="group" aria-label="Theme presets">
+          <button class="theme-preset" type="button" data-theme-preset="studio" aria-pressed="false">
+            <span class="theme-preset-colors"><i style="--preset-color:#7c3aed"></i><i style="--preset-color:#f5f3ff"></i><i style="--preset-color:#ffffff"></i></span>
+            <span><strong>Studio</strong><small>Bright &amp; expressive</small></span><i data-lucide="check" class="theme-preset-check h-4 w-4"></i>
+          </button>
+          <button class="theme-preset" type="button" data-theme-preset="midnight" aria-pressed="false">
+            <span class="theme-preset-colors"><i style="--preset-color:#38bdf8"></i><i style="--preset-color:#172033"></i><i style="--preset-color:#0f172a"></i></span>
+            <span><strong>Midnight</strong><small>Dark &amp; focused</small></span><i data-lucide="check" class="theme-preset-check h-4 w-4"></i>
+          </button>
+          <button class="theme-preset" type="button" data-theme-preset="calm" aria-pressed="false">
+            <span class="theme-preset-colors"><i style="--preset-color:#0f766e"></i><i style="--preset-color:#eff8f5"></i><i style="--preset-color:#ffffff"></i></span>
+            <span><strong>Calm</strong><small>Soft &amp; balanced</small></span><i data-lucide="check" class="theme-preset-check h-4 w-4"></i>
+          </button>
+          <button class="theme-preset" type="button" data-theme-preset="classic" aria-pressed="false">
+            <span class="theme-preset-colors"><i style="--preset-color:#2563eb"></i><i style="--preset-color:#f4f6fb"></i><i style="--preset-color:#ffffff"></i></span>
+            <span><strong>Classic</strong><small>Clean &amp; familiar</small></span><i data-lucide="check" class="theme-preset-check h-4 w-4"></i>
+          </button>
+        </div>
+      </section>
+
+      <section class="theme-card mb-5 p-6 max-[620px]:p-4" aria-labelledby="appearance-heading">
+        <div class="mb-5 flex items-center gap-3">
+          <span class="grid h-10 w-10 place-items-center rounded-full bg-[#f2f2f2] text-[#0f0f0f]">
+            <i data-lucide="sun-moon" class="h-5 w-5"></i>
+          </span>
+          <div>
+            <h2 id="appearance-heading" class="m-0 text-lg font-semibold">Appearance</h2>
+            <p class="m-0 mt-1 text-sm text-[#606060]">Choose a light or dark interface, or follow your device.</p>
+          </div>
+        </div>
+        <label class="mb-2 block text-sm font-medium" for="appearance">Color mode</label>
+        <select id="appearance" class="theme-control w-full max-w-md px-3 py-2.5 text-sm" data-setting="appearance">
+          <option value="light">Light</option>
+          <option value="dark">Dark</option>
+          <option value="system">Use device setting</option>
+        </select>
+      </section>
+
+      <section class="theme-card mb-5 p-6 max-[620px]:p-4" aria-labelledby="color-heading">
+        <div class="mb-5 flex items-center gap-3">
+          <span class="grid h-10 w-10 place-items-center rounded-full bg-[#f2f2f2] text-[#0f0f0f]">
+            <i data-lucide="paintbrush" class="h-5 w-5"></i>
+          </span>
+          <div>
+            <h2 id="color-heading" class="m-0 text-lg font-semibold">Accent color</h2>
+            <p class="m-0 mt-1 text-sm text-[#606060]">Pick a color for highlights and selected navigation.</p>
+          </div>
+        </div>
+        <label class="flex w-fit cursor-pointer items-center gap-3 text-sm font-medium" for="accent">
+          <input id="accent" class="h-11 w-14 cursor-pointer rounded-lg border-0 bg-transparent p-0" type="color" value="#2563eb" data-setting="accent">
+          <span>Choose your color</span>
+        </label>
+        <div class="accent-swatches mt-4" role="group" aria-label="Accent color presets">
+          <button class="accent-swatch" style="--swatch-color: #2563eb" type="button" data-accent-preset="#2563eb" aria-label="Blue accent" title="Blue"></button>
+          <button class="accent-swatch" style="--swatch-color: #7c3aed" type="button" data-accent-preset="#7c3aed" aria-label="Violet accent" title="Violet"></button>
+          <button class="accent-swatch" style="--swatch-color: #0f766e" type="button" data-accent-preset="#0f766e" aria-label="Teal accent" title="Teal"></button>
+          <button class="accent-swatch" style="--swatch-color: #db2777" type="button" data-accent-preset="#db2777" aria-label="Pink accent" title="Pink"></button>
+          <button class="accent-swatch" style="--swatch-color: #ea580c" type="button" data-accent-preset="#ea580c" aria-label="Orange accent" title="Orange"></button>
+          <button class="accent-swatch" style="--swatch-color: #4d7c0f" type="button" data-accent-preset="#4d7c0f" aria-label="Green accent" title="Green"></button>
+        </div>
+      </section>
+
+      <section class="theme-card mb-5 p-6 max-[620px]:p-4" aria-labelledby="typography-heading">
+        <div class="mb-5 flex items-center gap-3">
+          <span class="grid h-10 w-10 place-items-center rounded-full bg-[#f2f2f2] text-[#0f0f0f]">
+            <i data-lucide="type" class="h-5 w-5"></i>
+          </span>
+          <div>
+            <h2 id="typography-heading" class="m-0 text-lg font-semibold">Typography</h2>
+            <p class="m-0 mt-1 text-sm text-[#606060]">Adjust the typeface and overall reading size.</p>
+          </div>
+        </div>
+        <div class="grid gap-5 sm:grid-cols-2">
+          <div>
+            <label class="mb-2 block text-sm font-medium" for="font">Font</label>
+            <select id="font" class="theme-control w-full px-3 py-2.5 text-sm" data-setting="font">
+              <option value="system">System sans-serif</option>
+              <option value="rounded">Rounded</option>
+              <option value="serif">Serif</option>
+              <option value="mono">Monospaced</option>
+            </select>
+          </div>
+          <div>
+            <label class="mb-2 flex items-center justify-between text-sm font-medium" for="font-size">
+              <span>Text size</span><output id="font-size-value">16 px</output>
+            </label>
+            <input id="font-size" class="w-full accent-[var(--app-accent)]" type="range" min="14" max="20" step="1" value="16" data-setting="fontSize">
+            <div class="mt-1 flex justify-between text-xs text-[#606060]"><span>Small</span><span>Large</span></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="theme-card p-6 max-[620px]:p-4" aria-labelledby="layout-heading">
+        <div class="mb-5 flex items-center gap-3">
+          <span class="grid h-10 w-10 place-items-center rounded-full bg-[#f2f2f2] text-[#0f0f0f]">
+            <i data-lucide="sliders-horizontal" class="h-5 w-5"></i>
+          </span>
+          <div>
+            <h2 id="layout-heading" class="m-0 text-lg font-semibold">Layout &amp; comfort</h2>
+            <p class="m-0 mt-1 text-sm text-[#606060]">Fine-tune spacing, corners, and motion.</p>
+          </div>
+        </div>
+        <div class="divide-y divide-[#e5e5e5]">
+          <div class="flex flex-wrap items-center justify-between gap-3 py-4 first:pt-0">
+            <div>
+              <label class="block text-sm font-medium" for="density">Interface spacing</label>
+              <span class="text-sm text-[#606060]">Choose a compact or comfortable layout.</span>
+            </div>
+            <select id="density" class="theme-control min-w-40 px-3 py-2 text-sm" data-setting="density">
+              <option value="comfortable">Comfortable</option>
+              <option value="compact">Compact</option>
+            </select>
+          </div>
+          <div class="flex flex-wrap items-center justify-between gap-3 py-4">
+            <div>
+              <label class="block text-sm font-medium" for="panel-style">Card appearance</label>
+              <span class="text-sm text-[#606060]">Choose how cards stand out from the page.</span>
+            </div>
+            <select id="panel-style" class="theme-control min-w-40 px-3 py-2 text-sm" data-setting="panelStyle">
+              <option value="classic">Classic</option>
+              <option value="soft">Soft tint</option>
+              <option value="raised">Elevated</option>
+            </select>
+          </div>
+          <div class="flex flex-wrap items-center justify-between gap-3 py-4">
+            <div>
+              <label class="block text-sm font-medium" for="page-tone">Page tone</label>
+              <span class="text-sm text-[#606060]">Set a neutral, warm, or cool canvas.</span>
+            </div>
+            <select id="page-tone" class="theme-control min-w-40 px-3 py-2 text-sm" data-setting="pageTone">
+              <option value="neutral">Neutral</option>
+              <option value="warm">Warm</option>
+              <option value="cool">Cool</option>
+            </select>
+          </div>
+          <label class="flex cursor-pointer items-center justify-between gap-4 py-4">
+            <span>
+              <span class="block text-sm font-medium">Rounded corners</span>
+              <span class="text-sm text-[#606060]">Use softer corners on cards.</span>
+            </span>
+            <input class="h-5 w-5 accent-[var(--app-accent)]" type="checkbox" data-setting="rounded">
+          </label>
+          <label class="flex cursor-pointer items-center justify-between gap-4 py-4 last:pb-0">
+            <span>
+              <span class="block text-sm font-medium">Reduce motion</span>
+              <span class="text-sm text-[#606060]">Minimize interface animations and transitions.</span>
+            </span>
+            <input class="h-5 w-5 accent-[var(--app-accent)]" type="checkbox" data-setting="reducedMotion">
+          </label>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script type="module" src="../js/shell.js"></script>
+  <script type="module" src="../js/theme.js"></script>
+  <script>
+    const fontSize = document.querySelector("#font-size");
+    const fontSizeValue = document.querySelector("#font-size-value");
+    fontSize.addEventListener("input", () => {
+      fontSizeValue.value = `${fontSize.value} px`;
+    });
+    fontSize.addEventListener("change", () => {
+      fontSizeValue.value = `${fontSize.value} px`;
+    });
+    fontSizeValue.value = `${fontSize.value} px`;
+  </script>
+<script type="module" src="../js/analytics.js"></script></body>
+</html>
