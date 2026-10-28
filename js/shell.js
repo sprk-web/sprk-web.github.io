@@ -137,6 +137,14 @@ import { SITE_CONFIG } from "./config.js";
 
   const searchForm = document.querySelector('form[role="search"]');
   const searchInput = document.querySelector("#site-search");
+  try {
+    const savedTheme = JSON.parse(localStorage.getItem(SITE_CONFIG.theme.storageKey) || "{}");
+    const themeButton = document.querySelector("#theme-cycle");
+    if (themeButton && savedTheme.appearance) {
+      themeButton.setAttribute("aria-label", `Theme: ${savedTheme.appearance}`);
+      themeButton.setAttribute("title", `Theme: ${savedTheme.appearance} (click to change)`);
+    }
+  } catch { /* Keep the default theme control usable if storage is blocked. */ }
   const shortcutsDialogElement = document.querySelector("#shortcuts-dialog");
   const openShortcuts = () => {
     if (shortcutsDialogElement && !shortcutsDialogElement.open) shortcutsDialogElement.showModal();

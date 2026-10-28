@@ -129,15 +129,32 @@ import { SITE_CONFIG } from "./config.js";
       accentControl.value = button.dataset.accentPreset;
       accentControl.dispatchEvent(new Event("input", { bubbles: true }));
     });
-    document.querySelectorAll("[data-theme-preset]").forEach((button) => {
-      button.addEventListener("click", () => {
-        const preset = presets[button.dataset.themePreset];
-        if (!preset) return;
-        preferences = { ...preferences, ...preset };
-        syncControls();
-        savePreferences();
-      });
+  });
+
+  // Bind theme presets once, independently of whether accent presets exist.
+  document.querySelectorAll("[data-theme-preset]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const preset = presets[button.dataset.themePreset];
+      if (!preset) return;
+      preferences = { ...preferences, ...preset };
+      syncControls();
+      savePreferences();
     });
+  });
+
+  // The header control cycles light → dark → system and persists the choice.
+  document.querySelector("#theme-cycle")?.addEventListener("click", () => {
+    const modes = ["light", "dark", "system"];
+    const current = modes.indexOf(preferences.appearance);
+    preferences.appearance = modes[(current + 1) % modes.length];
+    syncControls();
+    savePreferences();
+    const button = document.querySelector("#theme-cycle");
+    const label = `Theme: ${preferences.appearance}`;
+    if (button) {
+      button.setAttribute("aria-label", label);
+      button.setAttribute("title", `${label} (click to change)`);
+    }
   });
 
   function updatePreference(event) {

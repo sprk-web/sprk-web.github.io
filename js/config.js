@@ -2,6 +2,7 @@ export const SITE_CONFIG = {
   name: "SPRK-Web",
   pageTitles: {
     home: "SPRK-Web",
+    simulations: "Simulations - SPRK-Web",
     account: "Your account - SPRK-Web",
     updates: "Updates - SPRK-Web",
     admin: "SPRK Admin",
