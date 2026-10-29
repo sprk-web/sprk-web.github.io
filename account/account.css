@@ -2,7 +2,7 @@
   width: auto;
   max-width: none;
   margin: 0;
-  padding: clamp(24px, 4vw, 40px) clamp(20px, 4vw, 48px) 64px;
+  padding: clamp(20px, 3vw, 32px) clamp(20px, 4vw, 48px) 64px;
 }
 
 html {
@@ -11,40 +11,8 @@ html {
 
 .account-page {
   display: grid;
-  gap: 28px;
   width: 100%;
   margin: 0;
-}
-
-.account-heading {
-  max-width: 700px;
-  border: 0;
-  background: transparent;
-  box-shadow: none;
-}
-
-.account-eyebrow {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  margin: 0 0 10px;
-  color: var(--app-accent, #2563eb);
-  font-size: .72rem;
-  font-weight: 750;
-  letter-spacing: .13em;
-  text-transform: uppercase;
-}
-
-.account-heading h1 {
-  margin: 0;
-  font-size: clamp(2rem, 4vw, 2.8rem);
-  line-height: 1.1;
-}
-
-.account-heading > p:last-child {
-  margin: 12px 0 0;
-  color: var(--muted);
-  line-height: 1.65;
 }
 
 .account-panel {
@@ -471,19 +439,73 @@ html {
 .account-upload {
   grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
-  gap: 15px;
+  gap: 17px;
 }
 
 .account-upload .account-field-copy {
   display: grid;
-  gap: 7px;
+  justify-items: start;
+  gap: 9px;
+}
+
+.account-upload-title {
+  color: var(--ink);
+  font-size: .88rem;
+  font-weight: 700;
+}
+
+.account-upload-actions {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
 }
 
 .account-file-input {
-  max-width: 100%;
-  min-height: 40px !important;
-  padding: 5px !important;
-  font-size: .78rem !important;
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.account-upload-button {
+  display: inline-flex;
+  min-height: 39px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 13px;
+  border: 1px solid color-mix(in srgb, var(--app-accent, #2563eb) 24%, var(--line));
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--app-accent, #2563eb) 7%, var(--surface));
+  color: var(--app-accent, #2563eb);
+  font-size: .8rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 150ms ease, border-color 150ms ease;
+}
+
+.account-upload-button:hover {
+  border-color: var(--app-accent, #2563eb);
+  background: color-mix(in srgb, var(--app-accent, #2563eb) 12%, var(--surface));
+}
+
+.account-file-input:focus-visible + .account-upload-button {
+  outline: 3px solid color-mix(in srgb, var(--app-accent, #2563eb) 32%, transparent);
+  outline-offset: 2px;
+}
+
+.account-upload-file-name {
+  max-width: min(100%, 300px);
+  overflow: hidden;
+  color: var(--muted);
+  font-size: .76rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .account-profile-sidebar {

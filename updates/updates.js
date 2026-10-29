@@ -1,7 +1,14 @@
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from "../js/config.js";
+import { recordContentEngagement } from "../js/analytics.js";
 
 const app = document.querySelector("#updates-app");
 const oneDay = 24 * 60 * 60 * 1000;
+const pageSize = 20;
+const categories = {
+  release: { label: "Release", icon: "package-check" },
+  announcement: { label: "Announcement", icon: "megaphone" },
+  improvement: { label: "Improvement", icon: "sparkles" },
+};
 const escapeHtml = (value) => String(value ?? "").replace(/[&<>"']/g, (character) => ({
   "&": "&amp;",
   "<": "&lt;",
@@ -42,15 +49,27 @@ function isRecent(value, now = Date.now()) {
   return Number.isFinite(timestamp) && age >= 0 && age <= oneDay;
 }
 
+function updateCategory(update) {
+  return Object.hasOwn(categories, update.category) ? update.category : "announcement";
+}
+
+function updatePermalink(id) {
+  const url = new URL(window.location.href);
+  url.searchParams.set("id", id);
+  return url.href;
+}
+
+function sortUpdates(updates, sort) {
+  return updates.sort((a, b) => {
+    const first = new Date(a.created_at).getTime() || 0;
+    const second = new Date(b.created_at).getTime() || 0;
+    return sort === "oldest" ? first - second : second - first;
+  });
+}
+
 function renderEmpty(message, heading = "You're all caught up") {
   app.innerHTML = `<section class="updates-page">
-    <header class="updates-hero">
-      <div class="updates-hero-copy">
-        <p class="updates-eyebrow"><span aria-hidden="true"></span>WHAT'S NEW</p>
-        <h1>Updates</h1>
-        <p>Product news, fresh ideas, and little improvements to your learning space.</p>
-      </div>
-    </header>
+    <h1 class="sr-only">Updates</h1>
     <div class="theme-card updates-empty">
       <span class="updates-empty-icon"><i data-lucide="bell-ring"></i></span>
       <h2>${escapeHtml(heading)}</h2>
@@ -98,51 +117,115 @@ function attachmentMarkup(update) {
   return items.length ? `<div class="update-media-list">${items.join("")}</div>` : "";
 }
 
-function renderUpdates(updates) {
+function renderUpdate(update) {
+  const recent = isRecent(update.created_at);
+  const category = updateCategory(update);
+  const { label, icon } = categories[category];
+  return `<article class="update-card" id="update-${escapeHtml(update.id)}" data-update-id="${escapeHtml(update.id)}" data-category="${category}" data-search="${escapeHtml(`${update.title || ""} ${update.body || ""}`.toLowerCase())}">
+    <div class="update-card-content">
+      <div class="update-card-meta"><span class="update-category update-category-${category}"><i data-lucide="${icon}"></i> ${label}</span>${recent ? '<span class="update-recent-tag"><span></span> Recent</span>' : ""}<time datetime="${escapeHtml(update.created_at || "")}">${escapeHtml(formatDate(update.created_at))}</time></div>
+      <h3>${escapeHtml(update.title || "Update")}</h3>
+      ${update.body ? `<p class="update-body">${escapeHtml(update.body)}</p>` : ""}
+      ${attachmentMarkup(update)}
+      <a class="update-share-link" href="${escapeHtml(updatePermalink(String(update.id)))}"><i data-lucide="link"></i> Permalink</a>
+    </div>
+  </article>`;
+}
+
+function renderCards(updates) {
+  const list = app.querySelector(".updates-list");
+  list.innerHTML = updates.map(renderUpdate).join("");
+  window.lucide?.createIcons();
+}
+
+function updateSummary(updates) {
+  app.querySelector("#updates-count").textContent = String(updates.length);
   const recentCount = updates.filter((update) => isRecent(update.created_at)).length;
+  const recentSummary = app.querySelector("#updates-recent-summary");
+  recentSummary.hidden = recentCount === 0;
+  recentSummary.innerHTML = `<i data-lucide="clock-3"></i><span>${recentCount}</span> new in the last 24 hours`;
+  window.lucide?.createIcons();
+}
+
+function renderUpdates(updates) {
   app.innerHTML = `<section class="updates-page">
-    <header class="updates-hero">
-      <div class="updates-hero-copy">
-        <p class="updates-eyebrow"><span aria-hidden="true"></span>WHAT'S NEW</p>
-        <h1>Updates</h1>
-        <p>Product news, fresh ideas, and little improvements to your learning space.</p>
-        <div class="updates-hero-meta"><span><i data-lucide="newspaper"></i>${updates.length} ${updates.length === 1 ? "update" : "updates"}</span>${recentCount ? `<span class="updates-recent-summary"><i data-lucide="clock-3"></i>${recentCount} new in the last 24 hours</span>` : ""}</div>
-      </div>
-    </header>
-    <div class="updates-feed-heading"><div><p>STAY IN THE LOOP</p><h2>What’s new</h2></div><label class="updates-search"><i data-lucide="search"></i><input id="updates-search" type="search" placeholder="Find an update" aria-label="Find an update"></label></div>
-    <div class="updates-list">${updates.map((update) => {
-      const recent = isRecent(update.created_at);
-      return `<article class="update-card" data-search="${escapeHtml(`${update.title || ""} ${update.body || ""}`.toLowerCase())}">
-        <div class="update-card-content">
-          <div class="update-card-meta"><span class="update-category"><i data-lucide="sparkles"></i> SPRK NEWS</span>${recent ? '<span class="update-recent-tag"><span></span> Recent</span>' : ""}<time datetime="${escapeHtml(update.created_at || "")}">${escapeHtml(formatDate(update.created_at))}</time></div>
-          <h3>${escapeHtml(update.title || "Update")}</h3>
-          ${update.body ? `<p class="update-body">${escapeHtml(update.body)}</p>` : ""}
-          ${attachmentMarkup(update)}
-        </div>
-      </article>`;
-    }).join("")}</div>
-    <div class="updates-no-results" hidden><i data-lucide="search-x"></i><strong>No matching updates</strong><span>Try a different title or keyword.</span></div>
+    <div class="updates-feed-heading"><div><h1>What’s new</h1><div class="updates-summary"><span><i data-lucide="newspaper"></i><span id="updates-count">${updates.length}</span> <span>updates loaded</span></span><span class="updates-recent-summary" id="updates-recent-summary" hidden></span></div></div></div>
+    <div class="updates-controls">
+      <label class="updates-filter"><span>Category</span><select id="updates-category" aria-label="Filter by category"><option value="all">All categories</option><option value="release">Release</option><option value="announcement">Announcement</option><option value="improvement">Improvement</option></select></label>
+      <label class="updates-filter"><span>Sort</span><select id="updates-sort" aria-label="Sort updates"><option value="newest">Newest first</option><option value="oldest">Oldest first</option></select></label>
+      <label class="updates-search"><i data-lucide="search"></i><input id="updates-search" type="search" placeholder="Find an update" aria-label="Find an update"></label>
+    </div>
+    <div class="updates-list"></div>
+    <div class="updates-no-results" hidden><i data-lucide="search-x"></i><strong>No matching updates</strong><span>Try a different category or keyword.</span></div>
+    <div class="updates-load-more-wrap"${hasMore ? "" : " hidden"}><button class="updates-load-more" type="button">Load more</button><span class="updates-load-error" role="alert" hidden></span></div>
     <dialog class="updates-media-dialog" aria-label="Update media preview">
       <div class="updates-media-dialog-bar"><span id="updates-media-title"></span><button class="updates-media-close" type="button" aria-label="Close media preview"><i data-lucide="x"></i></button></div>
       <div class="updates-media-stage"></div>
     </dialog>
   </section>`;
 
+  renderCards(updates);
+  updateSummary(updates);
   const search = app.querySelector("#updates-search");
-  search.addEventListener("input", () => {
+  const categoryFilter = app.querySelector("#updates-category");
+  const sort = app.querySelector("#updates-sort");
+  const loadMoreButton = app.querySelector(".updates-load-more");
+  const loadMoreWrap = app.querySelector(".updates-load-more-wrap");
+  const loadError = app.querySelector(".updates-load-error");
+  const applyFilters = () => {
     const query = search.value.trim().toLowerCase();
+    const category = categoryFilter.value;
     let visibleCount = 0;
     app.querySelectorAll(".update-card").forEach((card) => {
-      const matches = card.dataset.search.includes(query);
+      const matches = card.dataset.search.includes(query)
+        && (category === "all" || card.dataset.category === category);
       card.hidden = !matches;
       if (matches) visibleCount += 1;
     });
-    app.querySelector(".updates-no-results").hidden = visibleCount > 0;
+    const noResults = app.querySelector(".updates-no-results");
+    noResults.hidden = visibleCount > 0;
+    noResults.querySelector("span").textContent = hasMore
+      ? "Load more to search additional updates."
+      : "Try a different category or keyword.";
+  };
+  search.addEventListener("input", applyFilters);
+  categoryFilter.addEventListener("change", applyFilters);
+  sort.addEventListener("change", async () => {
+    loadMoreButton.disabled = true;
+    loadError.hidden = true;
+    try {
+      await loadFirstPage(sort.value);
+    } catch (error) {
+      console.error("Could not sort updates.", error);
+      loadError.textContent = "Could not reload updates in that order. Please try again.";
+      loadError.hidden = false;
+    } finally {
+      loadMoreButton.disabled = false;
+    }
+  });
+  loadMoreButton.addEventListener("click", async () => {
+    loadMoreButton.disabled = true;
+    loadError.hidden = true;
+    try {
+      await loadNextPage(sort.value);
+      loadMoreWrap.hidden = !hasMore;
+    } catch (error) {
+      console.error("Could not load more updates.", error);
+      loadError.textContent = "Could not load more updates. Please try again.";
+      loadError.hidden = false;
+    } finally {
+      loadMoreButton.disabled = false;
+    }
   });
 
   const dialog = app.querySelector(".updates-media-dialog");
   const stage = dialog.querySelector(".updates-media-stage");
   app.addEventListener("click", (event) => {
+    const contentAction = event.target.closest(".update-card a, .update-card button[data-media-url]");
+    if (contentAction) {
+      const card = contentAction.closest(".update-card");
+      if (card) recordContentEngagement(card.dataset.updateId);
+    }
     const trigger = event.target.closest("[data-media-url]");
     if (!trigger) return;
     const url = safeMediaUrl(trigger.dataset.mediaUrl);
@@ -176,6 +259,81 @@ function renderUpdates(updates) {
   });
   dialog.addEventListener("close", () => stage.replaceChildren());
   window.lucide?.createIcons();
+  applyFilters();
+}
+
+let loadedUpdates = [];
+let nextOffset = 0;
+let hasMore = false;
+const linkedUpdateId = new URL(window.location.href).searchParams.get("id");
+let linkedUpdate = null;
+let activeSort = "newest";
+let db;
+const updateColumns = "id,title,body,image_url,attachment_url,attachment_name,category,created_at";
+
+function updatesQuery(sort) {
+  return db
+    .from("site_updates")
+    .select(updateColumns)
+    .eq("published", true)
+    .order("created_at", { ascending: sort === "oldest" });
+}
+
+async function loadFirstPage(sort = activeSort) {
+  const { data, error } = await updatesQuery(sort).range(0, pageSize - 1);
+  if (error) throw error;
+
+  const firstPage = data || [];
+  const hasNextPage = firstPage.length === pageSize;
+
+  if (linkedUpdateId && !firstPage.some((update) => String(update.id) === linkedUpdateId)) {
+    if (!linkedUpdate) {
+      const { data: linkedData, error: linkedError } = await db.from("site_updates")
+        .select(updateColumns)
+        .eq("published", true)
+        .eq("id", linkedUpdateId)
+        .maybeSingle();
+      if (linkedError) throw linkedError;
+      linkedUpdate = linkedData;
+    }
+    if (linkedUpdate) firstPage.push(linkedUpdate);
+  }
+  loadedUpdates = sortUpdates(firstPage, sort);
+  nextOffset = data?.length || 0;
+  hasMore = hasNextPage;
+  activeSort = sort;
+
+  if (!loadedUpdates.length) {
+    renderEmpty("There are no published updates yet.");
+    return;
+  }
+  if (!app.querySelector(".updates-list")) {
+    renderUpdates(loadedUpdates);
+  } else {
+    renderCards(loadedUpdates);
+    app.querySelector(".updates-load-more-wrap").hidden = !hasMore;
+    app.querySelector("#updates-search").dispatchEvent(new Event("input"));
+  }
+  updateSummary(loadedUpdates);
+
+  if (linkedUpdateId) {
+    document.getElementById(`update-${linkedUpdateId}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+}
+
+async function loadNextPage(sort) {
+  const { data, error } = await updatesQuery(sort).range(nextOffset, nextOffset + pageSize - 1);
+  if (error) throw error;
+  const existingIds = new Set(loadedUpdates.map((update) => String(update.id)));
+  const newUpdates = (data || []).filter((update) => !existingIds.has(String(update.id)));
+  loadedUpdates.push(...newUpdates);
+  sortUpdates(loadedUpdates, sort);
+  nextOffset += (data || []).length;
+  hasMore = (data || []).length === pageSize;
+  renderCards(loadedUpdates);
+  updateSummary(loadedUpdates);
+  app.querySelector(".updates-load-more-wrap").hidden = !hasMore;
+  app.querySelector("#updates-search").dispatchEvent(new Event("input"));
 }
 
 if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
@@ -185,22 +343,11 @@ if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
   script.src = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2";
   script.onload = async () => {
     try {
-      const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-      const { data, error } = await db
-        .from("site_updates")
-        .select("id,title,body,image_url,attachment_url,attachment_name,created_at")
-        .eq("published", true)
-        .order("created_at", { ascending: false })
-        .limit(100);
-      if (error) throw error;
-      if (!data?.length) {
-        renderEmpty("There are no published updates yet.");
-        return;
-      }
-      renderUpdates(data);
+      db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      await loadFirstPage();
     } catch (error) {
       console.error("Could not load updates.", error);
-      renderEmpty("Could not load updates. Check your connection and Supabase configuration.", "We couldn’t load updates");
+      renderEmpty("Could not load updates. Check your connection, Supabase configuration, and the update categories database migration.", "We couldn’t load updates");
     }
   };
   script.onerror = () => renderEmpty("Unable to load the updates service. Check your connection and try again.", "We couldn’t load updates");

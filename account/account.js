@@ -2,6 +2,17 @@ import { SUPABASE_URL, SUPABASE_ANON_KEY } from "../js/config.js";
 
 const app = document.querySelector("#account-app");
 const clientUrl = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2";
+const accountReturnPath = (() => {
+  const requestedPath = new URLSearchParams(location.search).get("return");
+  if (!requestedPath) return null;
+  try {
+    const destination = new URL(requestedPath, location.origin);
+    if (destination.origin !== location.origin || !["/simulator/", "/support/", "/community/"].some((prefix) => destination.pathname.startsWith(prefix))) return null;
+    return `${destination.pathname}${destination.search}${destination.hash}`;
+  } catch {
+    return null;
+  }
+})();
 const escapeHtml = (value) => String(value ?? "").replace(/[&<>"']/g, (character) => ({
   "&": "&amp;",
   "<": "&lt;",
@@ -105,12 +116,7 @@ function render(user = null, profile = {}) {
     : `<span aria-hidden="true">${escapeHtml(initial)}</span>`;
 
   app.innerHTML = `<section class="account-page">
-    <header class="account-heading">
-      <p class="account-eyebrow"><i data-lucide="user-round" class="h-4 w-4"></i> Personal space</p>
-      <h1>${user ? "Your account" : "Welcome to SPRK-Web"}</h1>
-      <p>${user ? "Your profile and sign-in settings, all in one place." : "Sign in to pick up where you left off, or create an account to get started."}</p>
-    </header>
-
+    <h1 class="sr-only">${user ? "Your account" : "Sign in to your account"}</h1>
     ${user ? `
       <section class="account-panel">
         <div class="account-profile-header">
@@ -135,14 +141,18 @@ function render(user = null, profile = {}) {
               <p class="account-section-copy">Add a name and a little about yourself so your profile feels like yours.</p>
             </div>
             <form id="profile-form" class="account-profile-form">
-              <label class="account-field account-upload" for="avatar-file">
+              <div class="account-upload">
                 <span id="avatar-upload-preview" class="account-avatar">${avatar}</span>
                 <span class="account-field-copy">
-                  <span>Profile picture</span>
-                  <input id="avatar-file" class="account-file-input" type="file" accept="image/*">
-                  <span class="account-field-hint">JPEG, PNG, or WebP. Resized and compressed before upload (10 MB maximum). Uploads need the avatars bucket and policies from <code>supabase-storage.sql</code>.</span>
+                  <strong class="account-upload-title">Profile picture</strong>
+                  <span class="account-upload-actions">
+                    <input id="avatar-file" class="account-file-input" type="file" accept="image/jpeg,image/png,image/webp" aria-label="Choose a profile picture">
+                    <label class="account-upload-button" for="avatar-file"><i data-lucide="image-plus" class="h-4 w-4"></i> Choose a photo</label>
+                    <span id="avatar-file-name" class="account-upload-file-name" role="status">No photo selected</span>
+                  </span>
+                  <span class="account-field-hint">JPEG, PNG, or WebP. Resized and compressed before upload; maximum 10 MB.</span>
                 </span>
-              </label>
+              </div>
               <label class="account-field" for="display-name">Display name
                 <input id="display-name" name="display_name" maxlength="80" value="${escapeHtml(displayName)}" placeholder="How should we address you?">
               </label>
@@ -312,6 +322,8 @@ function render(user = null, profile = {}) {
             form.reset();
             selectTab("signin");
             showMessage("Your account is ready. Check your email for a confirmation link.");
+          } else if (accountReturnPath) {
+            location.assign(accountReturnPath);
           } else {
             location.reload();
           }
@@ -355,18 +367,26 @@ function render(user = null, profile = {}) {
   let compressedAvatar = null;
   let previewUrl = null;
   const fileInput = document.querySelector("#avatar-file");
+  const avatarPreview = document.querySelector("#avatar-upload-preview");
+  const savedAvatarMarkup = avatarPreview.innerHTML;
   fileInput.onchange = async () => {
     compressedAvatar = null;
     const file = fileInput.files?.[0];
     if (!file) return;
+    document.querySelector("#avatar-file-name").textContent = file.name;
     try {
       compressedAvatar = await compressAvatar(file);
       if (previewUrl) URL.revokeObjectURL(previewUrl);
       previewUrl = URL.createObjectURL(compressedAvatar);
-      document.querySelector("#avatar-upload-preview").innerHTML = `<img src="${previewUrl}" alt="Compressed profile picture preview">`;
-      showMessage(`Picture ready to upload (${Math.ceil(compressedAvatar.size / 1024)} KB).`, "info");
+      avatarPreview.innerHTML = `<img src="${previewUrl}" alt="Compressed profile picture preview">`;
+      document.querySelector("#avatar-file-name").textContent = `${file.name} · ${Math.ceil(compressedAvatar.size / 1024)} KB`;
+      showMessage("Picture ready to upload when you save your profile.", "info");
     } catch (error) {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+      previewUrl = null;
+      avatarPreview.innerHTML = savedAvatarMarkup;
       showMessage(error.message, "error");
+      document.querySelector("#avatar-file-name").textContent = "No photo selected";
       fileInput.value = "";
     }
   };
