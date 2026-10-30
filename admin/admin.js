@@ -17,6 +17,7 @@ function renderOverview({ user, updates, publishedCount, views, recentViews, int
       <article class="admin-metric-card"><span class="admin-metric-icon"><i data-lucide="mouse-pointer-click" class="h-5 w-5"></i></span><p>Update interactions</p><strong>${Number(interactions).toLocaleString()}</strong><span>${Number(recentInteractions).toLocaleString()} in the last 7 days</span></article>
     </div>
     <div class="admin-tool-grid">
+      <a class="theme-card admin-tool-card" href="./communities/"><span class="admin-tool-icon"><i data-lucide="users-round" class="h-5 w-5"></i></span><span class="admin-tool-copy"><strong>Manage communities</strong><small>Create and edit public study communities, or remove communities and their discussions.</small></span><i data-lucide="arrow-up-right" class="admin-tool-arrow h-5 w-5"></i></a>
       <a class="theme-card admin-tool-card" href="./post-updates/"><span class="admin-tool-icon"><i data-lucide="megaphone" class="h-5 w-5"></i></span><span class="admin-tool-copy"><strong>Post updates</strong><small>Write announcements, save drafts, manage attachments, and edit or unpublish existing posts.</small></span><i data-lucide="arrow-up-right" class="admin-tool-arrow h-5 w-5"></i></a>
       <a class="theme-card admin-tool-card" href="./traffic/"><span class="admin-tool-icon"><i data-lucide="chart-no-axes-column-increasing" class="h-5 w-5"></i></span><span class="admin-tool-copy"><strong>Traffic analytics</strong><small>Compare date ranges, find popular pages, and see which updates visitors engage with.</small></span><i data-lucide="arrow-up-right" class="admin-tool-arrow h-5 w-5"></i></a>
     </div>
@@ -24,7 +25,7 @@ function renderOverview({ user, updates, publishedCount, views, recentViews, int
       <div class="admin-panel-heading"><span class="admin-panel-icon"><i data-lucide="file-text" class="h-5 w-5"></i></span><div><h2>Recent updates</h2><p>Latest content activity at a glance.</p></div><a class="admin-action" href="./post-updates/">Manage updates →</a></div>
       <div class="overflow-x-auto"><table class="admin-table w-full text-left text-sm"><thead><tr><th class="p-3">Title</th><th class="p-3">Created</th><th class="p-3">Status</th></tr></thead><tbody>${updates.slice(0, 6).map((item) => `<tr class="border-t border-slate-200"><td class="p-3 font-medium">${escapeHtml(item.title || "Untitled update")}</td><td class="p-3">${escapeHtml(formatDate(item.created_at))}</td><td class="p-3"><span class="admin-status ${item.published ? "is-published" : "is-draft"}">${item.published ? "Published" : "Draft"}</span></td></tr>`).join("") || '<tr><td colspan="3" class="p-4">No updates created yet.</td></tr>'}</tbody></table></div>
     </section>
-    <p class="admin-data-note"><i data-lucide="shield-check" class="h-4 w-4"></i>Admin access is checked against the configured email allowlist. Keep Supabase row-level security enabled for every admin table and storage bucket.</p>
+    <p class="admin-data-note"><i data-lucide="shield-check" class="h-4 w-4"></i>Admin access follows the signed-in profile’s <code>is_admin</code> flag. Keep Supabase row-level security enabled for every admin table and storage bucket.</p>
   </section>`;
 
   window.lucide?.createIcons();

@@ -1,46 +1,16 @@
-import { ADMIN_EMAILS, SUPABASE_ANON_KEY, SUPABASE_URL } from "./config.js";
+import { SUPABASE_ANON_KEY, SUPABASE_URL } from "./config.js";
 
 const recordedEvents = new Set();
-let projectRef = "";
-try {
-  projectRef = new URL(SUPABASE_URL).hostname.split(".")[0];
-} catch {
-  projectRef = "";
-}
-const authStorageKey = projectRef ? `sb-${projectRef}-auth-token` : "";
 
 function isLocalTestHost(hostname) {
   const host = hostname.toLowerCase().replace(/^\[|\]$/g, "");
   return host === "localhost" || host.endsWith(".localhost") || host === "::1" || /^127\./.test(host);
 }
 
-function isAdminSession() {
-  if (!authStorageKey) return true;
-  let storedSession;
-  try {
-    storedSession = localStorage.getItem(authStorageKey);
-  } catch (error) {
-    console.debug("SPRK analytics skipped because the local session could not be checked.", error);
-    return true;
-  }
-  if (!storedSession) return false;
-
-  try {
-    const stored = JSON.parse(storedSession);
-    const email = stored.user?.email || stored.session?.user?.email;
-    if (!email) return true;
-    return ADMIN_EMAILS.some((adminEmail) => adminEmail.toLowerCase() === String(email).toLowerCase());
-  } catch (error) {
-    console.debug("SPRK analytics skipped because the local session could not be checked.", error);
-    return true;
-  }
-}
-
 function canTrack() {
   return Boolean(SUPABASE_URL && SUPABASE_ANON_KEY)
     && !isLocalTestHost(location.hostname)
-    && !/(^|\/)admin(?:\/|$)/i.test(location.pathname)
-    && !isAdminSession();
+    && !/(^|\/)admin(?:\/|$)/i.test(location.pathname);
 }
 
 function wasRecorded(eventType, pagePath) {

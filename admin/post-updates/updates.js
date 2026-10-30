@@ -1,5 +1,6 @@
 import { SUPABASE_URL } from "../../js/config.js";
 import { escapeHtml, formatDate, renderAdminNavigation, requireAdmin, showAdminError } from "../admin-common.js";
+import { confirmDialog } from "../../js/dialogs.js";
 
 const app = document.querySelector("#admin-app");
 let context;
@@ -263,7 +264,7 @@ async function handleListAction(event) {
       if (error) throw error;
       if (!data) throw new Error("The update could not be found or you do not have permission to change its status.");
       await loadUpdates();
-    } else if (button.dataset.action === "delete" && window.confirm(`Delete “${item.title || "Untitled update"}”? This cannot be undone.`)) {
+    } else if (button.dataset.action === "delete" && await confirmDialog(`Delete “${item.title || "Untitled update"}”? This cannot be undone.`, { title: "Delete update", confirmLabel: "Delete", danger: true })) {
       const { data, error } = await context.db.from("site_updates").delete().eq("id", item.id).select("id").maybeSingle();
       if (error) throw error;
       if (!data) throw new Error("The update could not be found or you do not have permission to delete it.");

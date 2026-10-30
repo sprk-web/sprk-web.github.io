@@ -1,4 +1,5 @@
 import { SUPABASE_ANON_KEY, SUPABASE_URL } from "../js/config.js";
+import { confirmDialog, promptDialog } from "../js/dialogs.js";
 
 const app = document.querySelector("#community-app");
 const clientUrl = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2";
@@ -19,14 +20,13 @@ let profile = null;
 let isAdmin = false;
 let groups = [];
 let memberships = new Map();
-let pendingInvites = [];
 let activeGroupId = null;
 let messages = [];
-let activeFilter = "joined";
 let searchQuery = "";
 let messageQuery = "";
 let realtimeChannel = null;
 let typingTimer = null;
+const missingAttachmentNoticeGroups = new Set();
 
 function showNotice(message, kind = "success") {
   const notice = app.querySelector("#community-notice");
@@ -78,15 +78,12 @@ function groupSubtitle(group) {
 function groupListMarkup() {
   const visible = groups.filter((group) => {
     const matchesText = `${group.name} ${group.description}`.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesFilter = activeFilter === "discover"
-      ? !isMember(group.id) && memberships.get(group.id)?.status !== "banned" && (group.privacy === "public" || isAdmin)
-      : isMember(group.id);
-    return matchesText && matchesFilter;
+    const isDiscoverable = memberships.get(group.id)?.status !== "banned"
+      && (group.privacy === "public" || isAdmin);
+    return matchesText && (isMember(group.id) || isDiscoverable);
   });
   if (!visible.length) {
-    return `<p class="community-list-empty">${activeFilter === "joined"
-      ? "Your communities will appear here. Browse public communities or use an invite link to join."
-      : "No public communities match that search yet."}</p>`;
+    return `<p class="community-list-empty">No communities match that search yet.</p>`;
   }
   return visible.map((group) => `<button class="community-group-row" type="button" data-group="${escapeHtml(group.id)}" aria-current="${group.id === activeGroupId}">
     ${groupAvatar(group)}
@@ -99,81 +96,89 @@ function renderDirectory() {
   const list = app.querySelector("#community-group-list");
   if (!list) return;
   list.innerHTML = groupListMarkup();
-  app.querySelectorAll(".community-filter").forEach((button) => {
-    button.setAttribute("aria-pressed", String(button.dataset.filter === activeFilter));
-  });
   window.lucide?.createIcons();
 }
 
 function renderMessage(message) {
-  const mine = message.sender_id === currentUser.id;
-  const attachments = message.attachments || [];
-  const text = message.body ? `<p>${escapeHtml(message.body)}</p>` : "";
-  const fileHtml = attachments.map((attachment) => `<a class="community-attachment-link" href="${escapeHtml(attachment.url || "#")}" ${attachment.url ? 'target="_blank" rel="noopener noreferrer"' : ""}><i data-lucide="paperclip" class="h-4 w-4"></i>${escapeHtml(attachment.file_name || "Attachment")}</a>`).join("");
-  return `<article class="community-message ${mine ? "mine" : ""}" data-message="${escapeHtml(message.id)}">
-    ${mine ? "" : `<span class="community-message-avatar" title="${escapeHtml(message.sender_id)}">${escapeHtml(initialFor(message.sender_name || message.sender_id))}</span>`}
-    <div>
-      <div class="community-message-bubble">
-        <div class="community-message-meta"><strong>${mine ? "You" : escapeHtml(message.sender_name || `Member ${shortId(message.sender_id)}`)}</strong><time datetime="${escapeHtml(message.created_at)}">${escapeHtml(new Date(message.created_at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }))}</time></div>
-        ${text}${fileHtml}
-      </div>
-      <div class="community-message-tools"><button type="button" data-action="report-message" data-message-id="${escapeHtml(message.id)}">Report</button></div>
-    </div>
+  const attachments = (message.attachments || []).map(renderMessageAttachment).join("");
+  const canDeleteMessages = isAdmin || isGroupAdmin(activeGroupId);
+  const author = message.sender_id === currentUser.id
+    ? "You"
+    : message.sender_name || `Member ${shortId(message.sender_id)}`;
+  const replies = messages.filter((row) => row.parent_message_id === message.id);
+  const replyMarkup = replies.map((reply) => `<article class="community-forum-reply" data-message="${escapeHtml(reply.id)}">
+      <div class="community-forum-meta"><strong>${reply.sender_id === currentUser.id ? "You" : escapeHtml(reply.sender_name || `Member ${shortId(reply.sender_id)}`)}</strong><time datetime="${escapeHtml(reply.created_at)}">${escapeHtml(whenLabel(reply.created_at))}</time></div>
+      <p>${escapeHtml(reply.body)}</p>${(reply.attachments || []).map((attachment) => renderMessageAttachment(attachment)).join("")}
+      <div class="community-forum-topic-tools">${isMember(activeGroupId) ? `<button class="community-forum-report" type="button" data-action="report-message" data-message-id="${escapeHtml(reply.id)}">Report</button>` : ""}${canDeleteMessages ? `<button class="community-forum-report" type="button" data-action="delete-message" data-message-id="${escapeHtml(reply.id)}">Delete</button>` : ""}</div>
+    </article>`).join("");
+  return `<article class="community-forum-topic" data-message="${escapeHtml(message.id)}">
+    <div class="community-forum-meta"><strong>${escapeHtml(author)}</strong><time datetime="${escapeHtml(message.created_at)}">${escapeHtml(whenLabel(message.created_at))}</time></div>
+    <h3>${escapeHtml(message.topic_title || "Study discussion")}</h3>
+    ${message.body ? `<p class="community-forum-body">${escapeHtml(message.body)}</p>` : ""}${attachments}
+    <div class="community-forum-topic-tools"><span>${replies.length} ${replies.length === 1 ? "reply" : "replies"}</span>${isMember(activeGroupId) ? `<button class="community-forum-report" type="button" data-action="report-message" data-message-id="${escapeHtml(message.id)}">Report</button><button class="community-forum-reply-toggle" type="button" data-action="toggle-reply" data-message-id="${escapeHtml(message.id)}">Reply</button>` : ""}${canDeleteMessages ? `<button class="community-forum-report" type="button" data-action="delete-message" data-message-id="${escapeHtml(message.id)}">Delete</button>` : ""}</div>
+    <div class="community-forum-replies">${replyMarkup}</div>
+    ${isMember(activeGroupId) ? `<form class="community-forum-reply-form" data-reply-form="${escapeHtml(message.id)}" hidden><label class="sr-only" for="reply-${escapeHtml(message.id)}">Reply to topic</label><textarea id="reply-${escapeHtml(message.id)}" name="body" maxlength="4000" rows="2" placeholder="Add a helpful reply…"></textarea><label class="community-forum-attach"><i data-lucide="paperclip" class="h-4 w-4"></i><span>Attach media or a file</span><input type="file" name="attachments" accept="image/*,video/*,audio/*,application/pdf" multiple></label><button class="community-button primary subtle" type="submit">Post reply</button></form>` : ""}
   </article>`;
+}
+
+function whenLabel(value) {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "Date unavailable" : date.toLocaleString([], { dateStyle: "medium", timeStyle: "short" });
+}
+
+function renderMessageAttachment(attachment) {
+  const url = escapeHtml(attachment.url || "#");
+  const name = escapeHtml(attachment.file_name || "Attachment");
+  const mime = String(attachment.mime_type || "").toLowerCase();
+  if (mime.startsWith("image/")) return `<button class="community-media-link" type="button" data-action="view-image" data-image-url="${url}" data-image-name="${name}" aria-label="View image: ${name}"><img class="community-media-image" src="${url}" alt="${name}" loading="lazy"></button>`;
+  if (mime.startsWith("video/")) return `<video class="community-media-video" controls preload="metadata" src="${url}">${name}</video>`;
+  if (mime.startsWith("audio/")) return `<audio class="community-media-audio" controls preload="metadata" src="${url}">${name}</audio>`;
+  return `<a class="community-attachment-link" href="${url}" target="_blank" rel="noopener noreferrer"><i data-lucide="paperclip" class="h-4 w-4"></i>${name} · ${escapeHtml(formatBytes(attachment.byte_size || 0))}</a>`;
 }
 
 function renderMessages(scroll = false) {
   const container = app.querySelector("#community-messages");
   if (!container) return;
   const normalized = messageQuery.trim().toLowerCase();
+  const roots = messages.filter((message) => !message.parent_message_id);
   const visible = normalized
-    ? messages.filter((message) => `${message.body} ${message.sender_id}`.toLowerCase().includes(normalized))
-    : messages;
+    ? roots.filter((message) => `${message.topic_title} ${message.body} ${message.sender_id}`.toLowerCase().includes(normalized)
+      || messages.some((reply) => reply.parent_message_id === message.id && `${reply.body} ${reply.sender_id}`.toLowerCase().includes(normalized)))
+    : roots;
   container.innerHTML = visible.length
     ? visible.map(renderMessage).join("")
-    : `<div class="community-empty-chat"><i data-lucide="${normalized ? "search-x" : "messages-square"}" class="h-8 w-8"></i><h2>${normalized ? "No matching messages" : "Start the conversation"}</h2><p>${normalized ? "Try another search." : "Say hello to your community. Your messages are only visible to its members."}</p></div>`;
+    : `<div class="community-empty-chat"><i data-lucide="${normalized ? "search-x" : "messages-square"}" class="h-8 w-8"></i><h2>${normalized ? "No matching topics" : "Start a study discussion"}</h2><p>${normalized ? "Try another search." : "Ask a question, share a solution, or explain a concept for other learners."}</p></div>`;
   window.lucide?.createIcons();
   if (scroll) container.scrollTop = container.scrollHeight;
 }
 
 function chatMarkup(group) {
   if (!group) {
-    return `<section class="community-empty-chat"><i data-lucide="users-round" class="h-10 w-10"></i><h2>Find your community</h2><p>Choose one of your communities, explore public groups, or accept an invite link to start chatting.</p></section>`;
+    return `<section class="community-empty-chat"><i data-lucide="users-round" class="h-10 w-10"></i><h2>Find a study forum</h2><p>Choose one of your communities or explore the public directory to join a discussion.</p></section>`;
   }
   const joined = isMember(group.id);
-  const groupAdmin = isGroupAdmin(group.id);
   return `<header class="community-chat-header">
-    <div class="community-chat-title">${groupAvatar(group)}<span><h2>${escapeHtml(group.name)}</h2><p>${escapeHtml(group.description || groupSubtitle(group))}</p></span></div>
+    <div class="community-chat-title">${groupAvatar(group)}<span><h2>${escapeHtml(group.name)}</h2></span></div>
     <div class="community-chat-tools">
-      ${joined && group.privacy === "invite_only" && groupAdmin ? '<button class="community-icon-button" type="button" data-action="invite" title="Manage invites" aria-label="Manage invites"><i data-lucide="user-plus" class="h-5 w-5"></i></button>' : ""}
-      ${(joined && groupAdmin) || isAdmin ? '<button class="community-icon-button" type="button" data-action="manage-group" title="Community settings" aria-label="Community settings"><i data-lucide="settings-2" class="h-5 w-5"></i></button>' : ""}
-      ${joined && !group.is_permanent ? '<button class="community-icon-button" type="button" data-action="leave-group" title="Leave community" aria-label="Leave community"><i data-lucide="log-out" class="h-5 w-5"></i></button>' : ""}
       ${!joined && !memberships.has(group.id) && group.privacy === "public" ? '<button class="community-button primary subtle" type="button" data-action="join-group"><i data-lucide="plus" class="h-4 w-4"></i><span>Join</span></button>' : ""}
       ${memberships.get(group.id)?.status === "banned" ? '<span class="community-badge">Banned</span>' : ""}
-      ${!joined && group.privacy === "invite_only" ? '<span class="community-badge">Invite-only</span>' : ""}
-      <button class="community-icon-button" type="button" data-action="search-messages" title="Search messages" aria-label="Search messages"><i data-lucide="search" class="h-5 w-5"></i></button>
+      <button class="community-icon-button" type="button" data-action="search-messages" title="Search topics" aria-label="Search topics"><i data-lucide="search" class="h-5 w-5"></i></button>
       ${joined ? '<button class="community-icon-button" type="button" data-action="report-group" title="Report community" aria-label="Report community"><i data-lucide="flag" class="h-5 w-5"></i></button>' : ""}
     </div>
   </header>
-  ${joined ? `<input id="community-message-search" class="community-message-search" type="search" aria-label="Search messages" placeholder="Search in conversation…" ${messageQuery ? "" : "hidden"} value="${escapeHtml(messageQuery)}">
-    <div id="community-messages" class="community-messages" aria-live="polite"></div><div id="community-typing" class="community-typing" aria-live="polite"></div>
-    <form id="community-compose" class="community-compose">
-      <div id="community-attachment-preview" class="community-attachment-preview" hidden></div>
-      <div class="community-compose-box">
-        <textarea name="body" rows="1" maxlength="4000" aria-label="Write a message" placeholder="Message ${escapeHtml(group.name)}…"></textarea>
-        <div class="community-compose-actions">
-          <label class="community-icon-button" title="Attach a file" aria-label="Attach a file"><i data-lucide="paperclip" class="h-5 w-5"></i><input id="community-attachment" type="file" hidden></label>
-          <button class="community-icon-button" type="button" data-action="insert-emoji" title="Add an emoji" aria-label="Add an emoji"><i data-lucide="smile" class="h-5 w-5"></i></button>
-          <button class="community-send" type="submit" aria-label="Send message"><i data-lucide="send" class="h-4 w-4"></i></button>
-        </div>
-      </div>
-      <div class="community-compose-hint">Enter to send · Shift + Enter for a new line</div>
-    </form>` : `<div class="community-empty-chat"><i data-lucide="${group.privacy === "public" ? "messages-square" : "lock-keyhole"}" class="h-9 w-9"></i><h2>${group.privacy === "public" ? "Join to see the conversation" : "Invite-only community"}</h2><p>${group.privacy === "public" ? "Join this public community to read and send messages." : "You need a valid invitation link from a community admin to join."}</p></div>`}`;
+  <input id="community-message-search" class="community-message-search" type="search" aria-label="Search study topics" placeholder="Search topics and replies…" ${messageQuery ? "" : "hidden"} value="${escapeHtml(messageQuery)}">
+  <div id="community-messages" class="community-forum-list" aria-live="polite"></div>
+  ${joined ? `<form id="community-compose" class="community-forum-compose">
+      <h3>Start a study topic</h3>
+      <label class="sr-only" for="community-topic-title">Topic title</label><input id="community-topic-title" name="topic_title" maxlength="160" required placeholder="What are you studying or asking?">
+      <label class="sr-only" for="community-topic-body">Topic details</label><textarea id="community-topic-body" name="body" rows="3" maxlength="4000" placeholder="Add context, your approach, or what you have tried…"></textarea>
+      <div class="community-forum-compose-actions"><label class="community-forum-attach"><i data-lucide="paperclip" class="h-4 w-4"></i><span>Attach media or a file</span><input type="file" name="attachments" accept="image/*,video/*,audio/*,application/pdf" multiple></label><button class="community-button primary" type="submit">Post topic</button></div>
+    </form>` : `<div class="community-forum-join-note">Join this public community to ask questions and reply to topics.</div>`}`;
 }
 
 function render() {
   if (!currentUser) {
-    app.innerHTML = `<section class="community-page"><div class="community-signin"><i data-lucide="users-round" class="h-10 w-10"></i><h1>Find your people</h1><p>Sign in to discover communities and join conversations. Premium members can create one.</p><a class="community-button primary" href="../account/?return=${encodeURIComponent("/community/")}">Sign in to continue</a></div></section>`;
+    app.innerHTML = `<section class="community-page"><div class="community-signin"><i data-lucide="users-round" class="h-10 w-10"></i><h1>Join the study forum</h1><p>Sign in to explore public study communities, ask questions, and share what you know.</p><a class="community-button primary" href="../account/?return=${encodeURIComponent("/community/")}">Sign in to continue</a></div></section>`;
     const signInLink = app.querySelector(".community-signin a");
     signInLink.href = `../account/?return=${encodeURIComponent(`${location.pathname}${location.search}${location.hash}`)}`;
     window.lucide?.createIcons();
@@ -181,43 +186,25 @@ function render() {
   }
   const group = activeGroup();
   app.innerHTML = `<div class="community-page">
-    <div class="community-topbar">
-      <div class="community-heading"><div><h1>Community</h1><p>Good conversations start with a shared curiosity.</p></div></div>
-      <div class="community-actions">
-        <button id="community-direct-invites" class="community-button" type="button"><i data-lucide="mail" class="h-4 w-4"></i> Invites${pendingInvites.length ? ` (${pendingInvites.length})` : ""}</button>
-        <button id="community-use-invite" class="community-button" type="button"><i data-lucide="link-2" class="h-4 w-4"></i> Use invite link</button>
-        ${isAdmin ? '<button id="community-moderation" class="community-button" type="button"><i data-lucide="shield-check" class="h-4 w-4"></i> Moderation</button>' : ""}
-        ${isPremium() ? '<button id="community-create" class="community-button primary" type="button"><i data-lucide="plus" class="h-4 w-4"></i> Create community</button>' : ""}
-        ${!isPremium() ? '<a class="community-button community-premium-link" href="../account/">Premium members can create communities <i data-lucide="arrow-up-right" class="h-4 w-4"></i></a>' : ""}
-      </div>
-    </div>
+    ${isAdmin ? `<div class="community-topbar"><div class="community-actions">
+        <a class="community-button" href="../admin/communities/"><i data-lucide="settings-2" class="h-4 w-4"></i> Manage communities</a>
+        <button id="community-moderation" class="community-button" type="button"><i data-lucide="shield-check" class="h-4 w-4"></i> Forum reports</button>
+      </div></div>` : ""}
     <div id="community-notice" class="community-notice" role="status" hidden></div>
     <div class="community-layout">
       <aside class="community-directory" aria-label="Your communities">
-        <div class="community-directory-head"><h2>Communities</h2><input id="community-search" class="community-search" type="search" placeholder="Search communities…" aria-label="Search communities"></div>
-        <div class="community-filter-row"><button type="button" class="community-filter" data-filter="joined" aria-pressed="true">Joined</button><button type="button" class="community-filter" data-filter="discover" aria-pressed="false">Discover</button></div>
+        <div class="community-directory-head"><h2>Public study forums</h2><input id="community-search" class="community-search" type="search" placeholder="Search communities…" aria-label="Search communities"></div>
         <div id="community-group-list" class="community-group-list"></div>
       </aside>
-      <section id="community-chat" class="community-chat" aria-label="Community chat">${chatMarkup(group)}</section>
+      <section id="community-chat" class="community-chat" aria-label="Community study forum">${chatMarkup(group)}</section>
     </div>
   </div>
-  <dialog id="community-create-dialog" class="community-modal">
-    <form id="community-create-form">
-      <div class="community-modal-heading"><div><h2>Create a community</h2><p>Start a space for people to share ideas and stay connected.</p></div><button class="community-icon-button" type="button" data-action="close-dialog" aria-label="Close"><i data-lucide="x" class="h-5 w-5"></i></button></div>
-      <label class="community-field">Community name<input name="name" required minlength="2" maxlength="80" placeholder="e.g. Physics Explorers"></label>
-      <label class="community-field">Description<textarea name="description" maxlength="2000" rows="3" placeholder="What brings this community together?"></textarea></label>
-      <label class="community-field">Icon URL<input name="icon_url" type="url" maxlength="2048" placeholder="https://…"><span class="community-field-hint">Or upload an image below.</span></label>
-      <label class="community-field">Upload icon<input name="icon_file" type="file" accept="image/png,image/jpeg,image/webp,image/gif"></label>
-      <fieldset class="community-field" style="border:0;padding:0"><legend>Privacy</legend><div class="community-choice-row">
-        <label class="community-choice"><input type="radio" name="privacy" value="public" checked><span><strong>Public</strong><small>Anyone can discover and join.</small></span></label>
-        <label class="community-choice"><input type="radio" name="privacy" value="invite_only"><span><strong>Invite-only</strong><small>Join with a link or direct invite.</small></span></label>
-      </div></fieldset>
-      <div class="community-modal-actions"><button class="community-button" type="button" data-action="close-dialog">Cancel</button><button class="community-button primary" type="submit">Create community</button></div>
-    </form>
-  </dialog>
   <dialog id="community-settings-dialog" class="community-modal"><div class="community-modal-content" id="community-settings-content"></div></dialog>
   <dialog id="community-invite-dialog" class="community-modal"><div class="community-modal-content" id="community-invite-content"></div></dialog>
-  <dialog id="community-reports-dialog" class="community-modal community-reports-modal"><div class="community-modal-content" id="community-reports-content"></div></dialog>`;
+  <dialog id="community-reports-dialog" class="community-modal community-reports-modal"><div class="community-modal-content" id="community-reports-content"></div></dialog>
+  <dialog id="community-image-dialog" class="community-modal community-image-dialog" aria-label="Image preview">
+    <figure><button class="community-image-close" type="button" aria-label="Close image preview">Close</button><img id="community-image-preview" alt=""><figcaption id="community-image-caption"></figcaption></figure>
+  </dialog>`;
   renderDirectory();
   renderMessages();
   bindPageEvents();
@@ -229,48 +216,22 @@ function bindPageEvents() {
     searchQuery = event.target.value.trim();
     renderDirectory();
   });
-  app.querySelectorAll(".community-filter").forEach((button) => {
-    button.addEventListener("click", () => {
-      activeFilter = button.dataset.filter;
-      renderDirectory();
-    });
-  });
   app.querySelector("#community-group-list").addEventListener("click", (event) => {
     const row = event.target.closest("[data-group]");
     if (row) selectGroup(row.dataset.group).catch(showError);
   });
-  app.querySelector("#community-create")?.addEventListener("click", () => app.querySelector("#community-create-dialog").showModal());
-  app.querySelector("#community-create-dialog").addEventListener("click", (event) => {
-    if (event.target.closest('[data-action="close-dialog"]')) {
-      app.querySelector("#community-create-dialog").close();
-    }
-  });
-  app.querySelector("#community-create-form").addEventListener("submit", createGroup);
-  app.querySelector("#community-use-invite").addEventListener("click", useInvitePrompt);
-  app.querySelector("#community-direct-invites").addEventListener("click", () => openDirectInvites().catch(showError));
   app.querySelector("#community-moderation")?.addEventListener("click", () => openGroupReports().catch(showError));
   app.querySelector("#community-chat").addEventListener("click", handleChatAction);
+  const imageDialog = app.querySelector("#community-image-dialog");
+  app.querySelector(".community-image-close").addEventListener("click", () => imageDialog.close());
+  imageDialog.addEventListener("click", (event) => {
+    if (event.target === imageDialog) imageDialog.close();
+  });
   app.querySelector("#community-chat").addEventListener("submit", sendMessage);
   app.querySelector("#community-chat").addEventListener("input", (event) => {
     if (event.target.matches("#community-message-search")) {
       messageQuery = event.target.value;
       renderMessages();
-    }
-  });
-  app.querySelector("#community-chat").addEventListener("change", (event) => {
-    if (event.target.matches("#community-attachment")) {
-      const file = event.target.files?.[0];
-      const preview = app.querySelector("#community-attachment-preview");
-      if (preview) {
-        preview.hidden = !file;
-        preview.textContent = file ? `${file.name} · ${formatBytes(file.size)} (click attachment icon to change)` : "";
-      }
-    }
-  });
-  app.querySelector("#community-chat").addEventListener("keydown", (event) => {
-    if (event.target.matches("#community-compose textarea") && event.key === "Enter" && !event.shiftKey) {
-      event.preventDefault();
-      event.target.closest("form").requestSubmit();
     }
   });
 }
@@ -281,7 +242,7 @@ function showError(error) {
 }
 
 async function loadGroups() {
-  const [groupResult, membershipResult, inviteResult] = await Promise.all([
+  const [groupResult, membershipResult] = await Promise.all([
     db.from("groups")
       .select("id,creator_id,name,description,icon_url,privacy,is_permanent,status,created_at")
       .eq("status", "active")
@@ -289,18 +250,15 @@ async function loadGroups() {
       .order("created_at", { ascending: false })
       .limit(200),
     db.from("group_members").select("group_id,role,status").eq("user_id", currentUser.id),
-    db.from("group_invites").select("id,group_id,created_at,expires_at")
-      .eq("invitee_user_id", currentUser.id).is("revoked_at", null).eq("use_count", 0)
-      .order("created_at", { ascending: false }).limit(50),
   ]);
   if (groupResult.error) throw groupResult.error;
   if (membershipResult.error) throw membershipResult.error;
-  if (inviteResult.error) throw inviteResult.error;
   groups = groupResult.data || [];
   memberships = new Map((membershipResult.data || []).map((membership) => [membership.group_id, membership]));
-  pendingInvites = (inviteResult.data || []).filter((invite) => !invite.expires_at || new Date(invite.expires_at) > new Date());
-  if (!groups.some((group) => group.id === activeGroupId && isMember(group.id))) {
-    activeGroupId = groups.find((group) => isMember(group.id))?.id || null;
+  if (!groups.some((group) => group.id === activeGroupId)) {
+    activeGroupId = groups.find((group) => isMember(group.id))?.id
+      || groups.find((group) => memberships.get(group.id)?.status !== "banned")?.id
+      || null;
   }
   render();
 }
@@ -312,18 +270,22 @@ async function selectGroup(groupId) {
   await loadMessages();
   await subscribeToGroup();
   render();
+  renderMessages(true);
+  if (missingAttachmentNoticeGroups.has(groupId)) {
+    showNotice("Some attachments are missing from storage and were hidden. Discussions are still available; please re-upload those files.", "error");
+  }
   const messageList = app.querySelector("#community-messages");
   if (messageList) messageList.scrollTop = messageList.scrollHeight;
 }
 
 async function loadMessages() {
   const group = activeGroup();
-  if (!group || !isMember(group.id)) {
+  if (!group) {
     messages = [];
     return;
   }
   const { data, error } = await db.from("group_messages")
-    .select("id,group_id,sender_id,body,created_at")
+    .select("id,group_id,sender_id,topic_title,parent_message_id,body,created_at")
     .eq("group_id", group.id)
     .eq("status", "visible")
     .order("created_at", { ascending: false })
@@ -337,14 +299,31 @@ async function loadMessages() {
       .in("message_id", rows.map((row) => row.id));
     if (attachmentError) throw attachmentError;
     const byMessage = new Map();
+    let hasMissingAttachments = false;
     for (const attachment of attachmentRows || []) {
-      const { data: signed, error: signedError } = await db.storage.from("group-attachments").createSignedUrl(attachment.storage_object_path, 300);
-      if (signedError) throw signedError;
+      const { data: signed, error: signedError } = await db.storage.from("group-attachments").createSignedUrl(attachment.storage_object_path, 3600);
+      if (signedError) {
+        const signedErrorDetails = `${signedError.message} ${signedError.status || ""} ${signedError.statusCode || ""}`.toLowerCase();
+        if (signedErrorDetails.includes("object not found") || signedErrorDetails.includes("404")) {
+          hasMissingAttachments = true;
+          continue;
+        }
+        throw signedError;
+      }
       const values = byMessage.get(attachment.message_id) || [];
-      values.push({ url: signed.signedUrl, file_name: attachment.storage_object_path.split("/").pop() });
+      values.push({
+        url: signed.signedUrl,
+        file_name: attachment.storage_object_path.split("/").pop(),
+        mime_type: attachment.mime_type,
+        byte_size: attachment.byte_size,
+      });
       byMessage.set(attachment.message_id, values);
     }
     messages = rows.map((row) => ({ ...row, attachments: byMessage.get(row.id) || [] }));
+    if (hasMissingAttachments && !missingAttachmentNoticeGroups.has(group.id)) {
+      missingAttachmentNoticeGroups.add(group.id);
+      showNotice("Some attachments are missing from storage and were hidden. Discussions are still available; please re-upload those files.", "error");
+    }
   } else {
     messages = [];
   }
@@ -358,23 +337,13 @@ async function subscribeToGroup() {
   }
   const group = activeGroup();
   if (!group || !isMember(group.id)) return;
-  realtimeChannel = db.channel(`community:${group.id}`, {
-    config: { presence: { key: currentUser.id } },
-  });
+  realtimeChannel = db.channel(`community:${group.id}`);
   realtimeChannel
-    .on("postgres_changes", { event: "*", schema: "public", table: "group_messages", filter: `group_id=eq.${group.id}` }, (payload) => {
-      const row = payload.new;
-      if (!row?.id) return;
-      if (payload.eventType === "DELETE") {
-        messages = messages.filter((message) => message.id !== payload.old.id);
-      } else if (row.status !== "visible") {
-        messages = messages.filter((message) => message.id !== row.id);
-      } else if (!messages.some((message) => message.id === row.id)) {
-        messages.push({ ...row, attachments: [] });
-      } else {
-        messages = messages.map((message) => message.id === row.id ? { ...message, ...row } : message);
-      }
-      renderMessages(true);
+    .on("postgres_changes", { event: "*", schema: "public", table: "group_messages", filter: `group_id=eq.${group.id}` }, () => {
+      if (activeGroupId === group.id) loadMessages().catch(showError);
+    })
+    .on("postgres_changes", { event: "INSERT", schema: "public", table: "group_message_attachments", filter: `group_id=eq.${group.id}` }, () => {
+      if (activeGroupId === group.id) loadMessages().catch(showError);
     })
     .on("postgres_changes", { event: "*", schema: "public", table: "group_members", filter: `group_id=eq.${group.id}` }, (payload) => {
       if (payload.new?.user_id === currentUser.id || payload.old?.user_id === currentUser.id) {
@@ -389,17 +358,7 @@ async function subscribeToGroup() {
         }).catch(showError);
       }
     })
-    .on("presence", { event: "sync" }, () => {
-      const presence = realtimeChannel.presenceState();
-      const others = Object.values(presence).flat().filter((entry) => entry.user_id !== currentUser.id && entry.typing);
-      const typing = app.querySelector("#community-typing");
-      if (typing) typing.textContent = others.length ? `${others.length === 1 ? "Someone is" : "People are"} typing…` : "";
-    })
-    .subscribe(async (status) => {
-      if (status === "SUBSCRIBED") {
-        await realtimeChannel.track({ user_id: currentUser.id, typing: false });
-      }
-    });
+    .subscribe();
 }
 
 async function createGroup(event) {
@@ -439,7 +398,6 @@ async function createGroup(event) {
     form.reset();
     app.querySelector("#community-create-dialog").close();
     showNotice("Your community is ready.");
-    activeFilter = "joined";
     await loadGroups();
     if (data?.id) await selectGroup(data.id);
     if (iconWarning) showNotice(`Community created, but its icon could not be uploaded: ${iconWarning}`, "error");
@@ -504,8 +462,23 @@ async function handleChatAction(event) {
   if (!group) return;
   const action = button.dataset.action;
   try {
+    if (action === "view-image") {
+      const dialog = app.querySelector("#community-image-dialog");
+      const image = app.querySelector("#community-image-preview");
+      image.src = button.dataset.imageUrl;
+      image.alt = button.dataset.imageName || "Community attachment";
+      app.querySelector("#community-image-caption").textContent = image.alt;
+      dialog.showModal();
+      return;
+    }
     if (action === "join-group") await joinPublicGroup(group.id);
-    if (action === "leave-group") await leaveGroup(group.id);
+    if (action === "toggle-reply") {
+      const form = app.querySelector(`[data-reply-form="${CSS.escape(button.dataset.messageId)}"]`);
+      if (form) {
+        form.hidden = !form.hidden;
+        if (!form.hidden) form.querySelector("textarea").focus();
+      }
+    }
     if (action === "search-messages") {
       const input = app.querySelector("#community-message-search");
       input.hidden = !input.hidden;
@@ -514,40 +487,68 @@ async function handleChatAction(event) {
     }
     if (action === "report-group") await reportTarget(group.id, null);
     if (action === "report-message") await reportTarget(group.id, button.dataset.messageId);
-    if (action === "manage-group") await openSettings(group);
-    if (action === "invite") await openInvites(group);
-    if (action === "insert-emoji") {
-      const textarea = app.querySelector("#community-compose textarea");
-      textarea.value += " 🙂";
-      textarea.focus();
-    }
+    if (action === "delete-message") await deleteGroupMessage(group, button.dataset.messageId);
     if (action === "close-dialog") button.closest("dialog").close();
   } catch (error) {
     showError(error);
   }
 }
 
+async function deleteGroupMessage(group, messageId) {
+  if (!isAdmin && !isGroupAdmin(group.id)) throw new Error("Community admin access is required to delete posts.");
+  const message = messages.find((row) => row.id === messageId);
+  if (!message) throw new Error("That post is no longer available. Refresh the community and try again.");
+  let replyIds = [];
+  if (!message.parent_message_id) {
+    const { data: replyRows, error: replyError } = await db.from("group_messages")
+      .select("id")
+      .eq("group_id", group.id)
+      .eq("parent_message_id", messageId);
+    if (replyError) throw replyError;
+    replyIds = (replyRows || []).map((reply) => reply.id);
+  }
+  const messageIds = [messageId, ...replyIds];
+  const confirmationMessage = replyIds.length
+    ? "Delete this topic, all of its replies, and their attachments? This cannot be undone."
+    : "Delete this post and its attachments? This cannot be undone.";
+  if (!await confirmDialog(confirmationMessage, { title: "Delete post", confirmLabel: "Delete", danger: true })) return;
+
+  const { data: attachmentRows, error: attachmentError } = await db.from("group_message_attachments")
+    .select("storage_object_path")
+    .eq("group_id", group.id)
+    .in("message_id", messageIds);
+  if (attachmentError) throw attachmentError;
+  const paths = (attachmentRows || []).map((attachment) => attachment.storage_object_path);
+  const { data: deletedRows, error: deleteError } = await db.from("group_messages")
+    .delete()
+    .eq("group_id", group.id)
+    .eq("id", messageId)
+    .select("id");
+  if (deleteError) throw deleteError;
+  if (!deletedRows?.length) throw new Error("The post could not be deleted. Check the community admin permissions and try again.");
+  if (paths.length) {
+    const { error: storageError } = await db.storage.from("group-attachments").remove(paths);
+    if (storageError) {
+      await loadMessages();
+      throw new Error(`The post was deleted, but its attachment files could not be removed from storage: ${storageError.message}`);
+    }
+  }
+  await loadMessages();
+  showNotice(replyIds.length
+    ? "Topic, replies, and attachments deleted."
+    : "Post and attachments deleted.");
+}
+
 async function joinPublicGroup(groupId) {
   const { error } = await db.rpc("join_public_group", { p_group_id: groupId });
   if (error) throw error;
   showNotice("You joined the community.");
-  activeFilter = "joined";
   await loadGroups();
   await selectGroup(groupId);
 }
 
-async function leaveGroup(groupId) {
-  if (!window.confirm("Leave this community? You can rejoin public communities later.")) return;
-  const { error } = await db.rpc("leave_group", { p_group_id: groupId });
-  if (error) throw error;
-  showNotice("You left the community.");
-  activeGroupId = null;
-  await loadGroups();
-  if (activeGroupId) await selectGroup(activeGroupId);
-}
-
 async function useInvitePrompt() {
-  const inviteUrl = window.prompt("Paste the community invite link:");
+  const inviteUrl = await promptDialog("Paste the community invite link:", "", { title: "Join with an invite link", confirmLabel: "Join" });
   if (!inviteUrl) return;
   try {
     const parsedInviteUrl = new URL(inviteUrl, location.origin);
@@ -560,7 +561,6 @@ async function useInvitePrompt() {
     if (error) throw error;
     const groupId = typeof data === "string" ? data : data?.group_id;
     showNotice("Invite accepted. Welcome to the community.");
-    activeFilter = "joined";
     await loadGroups();
     if (groupId) await selectGroup(groupId);
   } catch (error) {
@@ -578,18 +578,17 @@ async function acceptInviteFromUrl() {
   if (error) throw error;
   history.replaceState(null, "", `${location.pathname}${location.search}`);
   showNotice("Invite accepted. Welcome to the community.");
-  activeFilter = "joined";
   await loadGroups();
   const groupId = typeof data === "string" ? data : data?.group_id;
   if (groupId) await selectGroup(groupId);
 }
 
 async function reportTarget(groupId, messageId) {
-  const reason = window.prompt("Report reason: harassment, spam, unsafe, or other", "other");
+  const reason = await promptDialog("Report reason: harassment, spam, unsafe, or other", "other", { title: "Report content" });
   if (!reason) return;
   const normalizedReason = reason.trim().toLowerCase();
   if (!["harassment", "spam", "unsafe", "other"].includes(normalizedReason)) throw new Error("Choose harassment, spam, unsafe, or other.");
-  const details = window.prompt("Add details for the moderation team (optional):", "") || "";
+  const details = await promptDialog("Add details for the moderation team (optional):", "", { title: "Report details", confirmLabel: "Send report", multiline: true }) || "";
   const payload = {
     group_id: groupId,
     message_id: messageId,
@@ -626,7 +625,7 @@ async function openSettings(group) {
     try {
       if (button.dataset.action === "close-dialog") dialog.close();
       if (button.dataset.action === "delete-group") {
-        const confirmation = window.confirm(`Permanently delete "${group.name}" and all of its messages, members, and invitations? This cannot be undone.`);
+        const confirmation = await confirmDialog(`Permanently delete "${group.name}" and all of its messages, members, and invitations? This cannot be undone.`, { title: "Delete community", confirmLabel: "Delete", danger: true });
         if (!confirmation) return;
         button.disabled = true;
         await removeCommunityStorageFiles(group);
@@ -635,7 +634,6 @@ async function openSettings(group) {
         dialog.close();
         activeGroupId = null;
         messages = [];
-        activeFilter = "joined";
         await loadGroups();
         if (activeGroupId) await selectGroup(activeGroupId);
         showNotice("Community deleted.");
@@ -645,11 +643,10 @@ async function openSettings(group) {
         const confirmation = permanent
           ? "Make this community permanent? It becomes public and every existing and future account will be automatically joined."
           : "Remove permanent status? Existing members remain joined, but future users will not be auto-joined.";
-        if (!window.confirm(confirmation)) return;
+        if (!await confirmDialog(confirmation, { title: permanent ? "Make community permanent" : "Remove permanent status", confirmLabel: "Continue" })) return;
         const { error } = await db.rpc("admin_set_group_permanent", { p_group_id: group.id, p_is_permanent: permanent });
         if (error) throw error;
         dialog.close();
-        activeFilter = "joined";
         await loadGroups();
         showNotice(permanent ? "This is now a permanent community." : "Permanent status was removed.");
       }
@@ -670,7 +667,7 @@ async function openSettings(group) {
         await loadMemberList(group.id, content.querySelector("#community-members"));
       }
       if (button.dataset.action === "transfer-ownership") {
-        if (!window.confirm("Transfer community ownership? You will become an admin.")) return;
+        if (!await confirmDialog("Transfer community ownership? You will become an admin.", { title: "Transfer ownership", confirmLabel: "Transfer" })) return;
         const { error } = await db.rpc("transfer_group_ownership", {
           p_group_id: group.id,
           p_target_user_id: button.dataset.userId,
@@ -819,7 +816,6 @@ async function openDirectInvites() {
         if (error) throw error;
         dialog.close();
         showNotice("Invite accepted. Welcome to the community.");
-        activeFilter = "joined";
         await loadGroups();
         if (groupId) await selectGroup(groupId);
       } catch (error) {
@@ -921,18 +917,19 @@ async function createDirectInvite(groupId, inviteeUserId) {
 }
 
 async function sendMessage(event) {
-  const form = event.target.closest("#community-compose");
+  const form = event.target.closest("#community-compose, [data-reply-form]");
   if (!form) return;
   event.preventDefault();
   const group = activeGroup();
   if (!group || !isMember(group.id)) return;
   const submit = form.querySelector('[type="submit"]');
   const body = form.elements.body.value.trim();
-  const fileInput = form.querySelector("#community-attachment");
-  const file = fileInput.files?.[0];
-  if (!body && !file) return;
-  if (file && file.size > 50 * 1024 * 1024) {
-    showNotice("Attachments must be 50 MB or smaller.", "error");
+  const topicTitle = String(form.elements.topic_title?.value || "").trim();
+  const parentMessageId = form.dataset.replyForm || null;
+  const files = Array.from(form.elements.attachments.files || []);
+  if ((!parentMessageId && !topicTitle) || (!body && !files.length)) return;
+  if (files.some((file) => file.size > 50 * 1024 * 1024)) {
+    showNotice("Each attachment must be 50 MB or smaller.", "error");
     return;
   }
   submit.disabled = true;
@@ -940,44 +937,61 @@ async function sendMessage(event) {
     const { data: message, error } = await db.from("group_messages").insert({
       group_id: group.id,
       sender_id: currentUser.id,
+      topic_title: parentMessageId ? "" : topicTitle,
+      parent_message_id: parentMessageId,
       body,
-    }).select("id,group_id,sender_id,body,created_at").single();
+    }).select("id,group_id,sender_id,topic_title,parent_message_id,body,created_at").single();
     if (error) throw error;
-    if (file) {
+    if (files.length) {
+      const uploadedPaths = [];
       try {
-        const path = `${currentUser.id}/${group.id}/${message.id}/${crypto.randomUUID()}-${file.name.replace(/[^\w.-]/g, "_")}`;
-        const { error: uploadError } = await db.storage.from("group-attachments").upload(path, file, { contentType: file.type || "application/octet-stream", upsert: false });
-        if (uploadError) throw uploadError;
-        const { error: metadataError } = await db.from("group_message_attachments").insert({
-          group_id: group.id,
-          message_id: message.id,
-          uploader_id: currentUser.id,
-          storage_object_path: path,
-          mime_type: file.type || "application/octet-stream",
-          byte_size: file.size,
-        });
+        const attachments = [];
+        for (const file of files) {
+          const safeName = file.name.replace(/[^\w.-]/g, "_");
+          const path = `${currentUser.id}/${group.id}/${message.id}/${crypto.randomUUID()}-${safeName}`;
+          const { error: uploadError } = await db.storage.from("group-attachments").upload(path, file, {
+            contentType: file.type || "application/octet-stream",
+            upsert: false,
+          });
+          if (uploadError) throw new Error(`Could not upload "${file.name}": ${uploadError.message}`);
+          uploadedPaths.push(path);
+          attachments.push({
+            group_id: group.id,
+            message_id: message.id,
+            uploader_id: currentUser.id,
+            storage_object_path: path,
+            mime_type: file.type || "application/octet-stream",
+            byte_size: file.size,
+          });
+        }
+        const { error: metadataError } = await db.from("group_message_attachments").insert(attachments);
         if (metadataError) throw metadataError;
       } catch (error) {
+        let cleanupError = null;
+        if (uploadedPaths.length) {
+          const { error: removeError } = await db.storage.from("group-attachments").remove(uploadedPaths);
+          cleanupError = removeError;
+        }
         form.reset();
         await loadMessages();
-        showNotice(`Message sent, but its attachment could not be saved: ${error.message}`, "error");
+        const cleanupNotice = cleanupError ? ` Uploaded files could not be cleaned up: ${cleanupError.message}` : "";
+        showNotice(`Post saved, but its attachment${files.length === 1 ? "" : "s"} could not be saved: ${error.message}${cleanupNotice}`, "error");
         return;
       }
     }
     form.reset();
-    const preview = app.querySelector("#community-attachment-preview");
-    if (preview) { preview.hidden = true; preview.textContent = ""; }
-    await loadMessages();
+    if (parentMessageId) form.hidden = true;
+    try {
+      await loadMessages();
+    } catch (error) {
+      console.error("Community post was saved, but its attachments could not be displayed.", error);
+      showNotice(`Post saved${files.length ? " and its files uploaded" : ""}, but the attachments could not be displayed: ${error.message}`, "error");
+    }
   } catch (error) {
     showError(error);
   } finally {
     submit.disabled = false;
   }
-}
-
-async function notifyTyping(typing) {
-  if (!realtimeChannel) return;
-  await realtimeChannel.track({ user_id: currentUser.id, typing });
 }
 
 async function initialize() {
@@ -1003,19 +1017,10 @@ async function initialize() {
   isAdmin = Boolean(adminResult.data);
   render();
   await loadGroups();
-  await acceptInviteFromUrl();
-  if (activeGroupId && isMember(activeGroupId)) {
+  if (activeGroupId) {
     await loadMessages();
     await subscribeToGroup();
   }
-  const chat = app.querySelector("#community-chat");
-  chat.addEventListener("input", (event) => {
-    if (event.target.matches("#community-compose textarea")) {
-      notifyTyping(true).catch(showError);
-      window.clearTimeout(typingTimer);
-      typingTimer = window.setTimeout(() => notifyTyping(false).catch(showError), 1200);
-    }
-  });
 }
 
 const script = document.createElement("script");

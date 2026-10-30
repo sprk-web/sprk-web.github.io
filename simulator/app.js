@@ -1,4 +1,7 @@
 import { SIMULATOR_CONFIG, SUPABASE_ANON_KEY, SUPABASE_URL } from "../js/config.js";
+import { getAppDataSupabaseClient, isAppDataConfigured } from "../js/appDataSupabaseClient.js";
+import { getPrimarySupabaseClient } from "../js/supabaseClient.js";
+import { confirmDialog } from "../js/dialogs.js";
 
 const app = document.querySelector("#app");
 const categories = SIMULATOR_CONFIG.categories;
@@ -12,9 +15,11 @@ const STORAGE_KEYS = {
   recent: "sprk-sim-recent",
 };
 let supabase = null;
+let primaryClient = null;
 let currentUser = null;
 let currentProfile = {};
 let isAdmin = false;
+let currentSession = null;
 let allRows = [...demos];
 let userLikes = new Set();
 let activeCollection = "all";
@@ -109,14 +114,18 @@ async function loadSupabase() {
     document.head.append(script);
   });
   if (!window.supabase?.createClient) throw new Error("The SPRK account service did not initialize.");
-  supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-  const { data, error } = await supabase.auth.getSession();
+  primaryClient = getPrimarySupabaseClient();
+  const { data, error } = await primaryClient.auth.getSession();
   if (error) throw error;
-  currentUser = data.session?.user || null;
+  currentSession = data.session || null;
+  currentUser = currentSession?.user || null;
+  supabase = isAppDataConfigured() ? getAppDataSupabaseClient(currentSession) : null;
   await loadCurrentProfile();
-  supabase.auth.onAuthStateChange((event, session) => {
+  primaryClient.auth.onAuthStateChange((event, session) => {
     if (event === "INITIAL_SESSION") return;
+    currentSession = session || null;
     currentUser = session?.user || null;
+    supabase = isAppDataConfigured() ? getAppDataSupabaseClient(currentSession) : null;
     currentProfile = {};
     isAdmin = false;
     setTimeout(() => {
@@ -129,12 +138,12 @@ async function loadSupabase() {
 }
 
 async function loadCurrentProfile() {
-  if (!currentUser || !supabase) {
+  if (!currentUser || !primaryClient) {
     currentProfile = {};
     isAdmin = false;
     return;
   }
-  const { data, error } = await supabase
+  const { data, error } = await primaryClient
     .from("profiles")
     .select("display_name,is_admin")
     .eq("id", currentUser.id)
@@ -530,7 +539,7 @@ async function deleteSimulation(simulation) {
   if (!isAdmin || !supabase || String(simulation.id).startsWith("demo-")) {
     throw new Error("Only an SPRK admin can delete a published simulation.");
   }
-  if (!window.confirm(`Permanently delete "${simulation.title}"? Its comments, likes, reports, and view records will also be deleted. This cannot be undone.`)) return;
+  if (!await confirmDialog(`Permanently delete "${simulation.title}"? Its comments, likes, reports, and view records will also be deleted. This cannot be undone.`, { title: "Delete simulation", confirmLabel: "Delete", danger: true })) return;
   const button = document.querySelector("#viewer-delete");
   if (button) button.disabled = true;
   const { data, error } = await supabase.from("simulations")
@@ -763,12 +772,10 @@ async function publishSimulation(event) {
   button.textContent = "Publishing…";
   result.hidden = true;
   try {
-    const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-    if (sessionError) throw sessionError;
-    if (!sessionData.session) throw new Error("Your SPRK account session expired. Sign in again and retry.");
+    if (!currentSession) throw new Error("Your SPRK account session expired. Sign in again and retry.");
     const { data: created, error } = await supabase.from("simulations").insert({
       ...data,
-      owner_id: sessionData.session.user.id,
+      owner_id: currentSession.user.id,
       status: "published",
       code_size_bytes: new Blob([html]).size,
     }).select("id").single();

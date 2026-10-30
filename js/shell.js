@@ -1,4 +1,5 @@
 import { SITE_CONFIG, SUPABASE_ANON_KEY, SUPABASE_URL } from "./config.js";
+import { getPrimarySupabaseClient } from "./supabaseClient.js";
 
 (() => {
   const sidebarPreferenceKey = "sprk-sidebar-collapsed";
@@ -86,7 +87,7 @@ import { SITE_CONFIG, SUPABASE_ANON_KEY, SUPABASE_URL } from "./config.js";
     const control = document.querySelector("#auth-button");
     if (!control || !SUPABASE_URL || !SUPABASE_ANON_KEY) return;
     await loadHeaderSupabase();
-    const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const client = getPrimarySupabaseClient();
     const { data, error } = await client.auth.getSession();
     if (error) throw error;
     await updateHeaderProfile(client, data.session?.user || null);

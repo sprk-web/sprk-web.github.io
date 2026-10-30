@@ -1,4 +1,6 @@
-import { ADMIN_EMAILS, SUPABASE_ANON_KEY, SUPABASE_URL } from "../js/config.js";
+import { SUPABASE_ANON_KEY, SUPABASE_URL } from "../js/config.js";
+import { getPrimarySupabaseClient } from "../js/supabaseClient.js";
+import { getAppDataSupabaseClient, isAppDataConfigured } from "../js/appDataSupabaseClient.js";
 
 export const escapeHtml = (value) => String(value ?? "").replace(/[&<>"']/g, (character) => ({
   "&": "&amp;",
@@ -15,18 +17,23 @@ export function formatDate(value) {
     : new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(date);
 }
 
-export function showAdminError(app, message, signInHref = "../account/") {
-  app.innerHTML = `<section class="theme-card admin-access-card"><span class="admin-panel-icon"><i data-lucide="shield-check" class="h-5 w-5"></i></span><p class="admin-eyebrow">SITE MANAGEMENT</p><h1>Admin panel</h1><p class="admin-access-message">${escapeHtml(message)}</p><p class="admin-access-detail">Admin access is restricted by the email allowlist in js/config.js and Supabase row-level security. Do not put a service-role key in browser code.</p><a class="admin-action" href="${signInHref}">Sign in or return to your account <span aria-hidden="true">→</span></a></section>`;
+export function showAdminError(
+  app,
+  message,
+  signInHref = new URL("../account/", import.meta.url).href,
+  detail = "Admin access is controlled by the signed-in account’s profiles.is_admin flag and enforced by Supabase row-level security. Do not put a service-role key in browser code.",
+) {
+  app.innerHTML = `<section class="theme-card admin-access-card"><span class="admin-panel-icon"><i data-lucide="shield-check" class="h-5 w-5"></i></span><p class="admin-eyebrow">SITE MANAGEMENT</p><h1>Admin panel</h1><p class="admin-access-message">${escapeHtml(message)}</p><p class="admin-access-detail">${escapeHtml(detail)}</p><a class="admin-action" href="${signInHref}">Sign in or return to your account <span aria-hidden="true">→</span></a></section>`;
   window.lucide?.createIcons();
 }
 
-export async function requireAdmin(app, signInHref = "../account/") {
+export async function requireAdmin(app, signInHref = new URL("../account/", import.meta.url).href) {
   if (!SUPABASE_URL || !SUPABASE_ANON_KEY || !window.supabase?.createClient) {
     showAdminError(app, "Supabase is not configured or could not be loaded.", signInHref);
     return null;
   }
 
-  const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  const db = getPrimarySupabaseClient();
   const { data, error } = await db.auth.getSession();
   if (error) {
     showAdminError(app, error.message, signInHref);
@@ -38,11 +45,22 @@ export async function requireAdmin(app, signInHref = "../account/") {
     showAdminError(app, "Please sign in on the account page first.", signInHref);
     return null;
   }
-  if (!ADMIN_EMAILS.some((email) => email && email !== "replace-with-your-email@example.com" && email.toLowerCase() === String(user.email).toLowerCase())) {
-    showAdminError(app, "This account is not in ADMIN_EMAILS. Add your owner email to js/config.js, then refresh.", signInHref);
+  const { data: profile, error: profileError } = await db
+    .from("profiles")
+    .select("is_admin")
+    .eq("id", user.id)
+    .maybeSingle();
+  if (profileError) {
+    showAdminError(app, `Could not verify admin access: ${profileError.message}`, signInHref);
     return null;
   }
-  return { db, user };
+  if (!profile?.is_admin) {
+    showAdminError(app, "This account does not have admin access. An administrator must enable it on the account’s profile.", signInHref);
+    return null;
+  }
+  const session = data.session;
+  const appDataDb = isAppDataConfigured() && session ? getAppDataSupabaseClient(session) : null;
+  return { db, appDataDb, session, user };
 }
 
 export function renderAdminNavigation(activePage, email) {
@@ -51,6 +69,7 @@ export function renderAdminNavigation(activePage, email) {
     { key: "overview", label: "Overview", icon: "layout-dashboard", href: prefix },
     { key: "issues", label: "Simulation issues", icon: "shield-alert", href: `${prefix}issues/` },
     { key: "complaints", label: "Complaints", icon: "messages-square", href: `${prefix}complaints/` },
+    { key: "communities", label: "Communities", icon: "users-round", href: `${prefix}communities/` },
     { key: "updates", label: "Post updates", icon: "megaphone", href: `${prefix}post-updates/` },
     { key: "traffic", label: "Traffic analytics", icon: "chart-no-axes-column-increasing", href: `${prefix}traffic/` },
   ];

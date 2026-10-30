@@ -1,4 +1,6 @@
 import { SUPABASE_ANON_KEY, SUPABASE_URL } from "../js/config.js";
+import { getAppDataSupabaseClient, isAppDataConfigured } from "../js/appDataSupabaseClient.js";
+import { getPrimarySupabaseClient } from "../js/supabaseClient.js";
 
 const app = document.querySelector("#support-app");
 const params = new URLSearchParams(location.search);
@@ -12,6 +14,7 @@ const escapeHtml = (value) => String(value ?? "").replace(/[&<>"']/g, (character
 }[character]));
 
 let db;
+let appDataDb = null;
 let currentUser;
 let isAdmin = false;
 let complaints = [];
@@ -165,12 +168,13 @@ async function loadComplaints() {
 
 async function loadModerationNotices() {
   const [issueResult, complaintMessageResult] = await Promise.all([
-    db
-    .from("issue_messages")
-    .select("id,issue_id,body,created_at,read_at")
-    .eq("recipient_id", currentUser.id)
-    .order("created_at", { ascending: false })
-    .limit(50),
+    appDataDb
+      ? appDataDb.from("issue_messages")
+        .select("id,issue_id,body,created_at,read_at")
+        .eq("recipient_id", currentUser.id)
+        .order("created_at", { ascending: false })
+        .limit(50)
+      : Promise.resolve({ data: [], error: null }),
     db
       .from("admin_private_messages")
       .select("id,complaint_id,sender_id,body,created_at")
@@ -194,13 +198,14 @@ async function loadModerationNotices() {
 
 async function loadAdminInbox() {
   const [issueResult, complaintMessageResult] = await Promise.all([
-    db
-      .from("issue_messages")
-      .select("id,issue_id,body,created_at")
-      .eq("recipient_id", currentUser.id)
-      .neq("sender_id", currentUser.id)
-      .order("created_at", { ascending: false })
-      .limit(50),
+    appDataDb
+      ? appDataDb.from("issue_messages")
+        .select("id,issue_id,body,created_at")
+        .eq("recipient_id", currentUser.id)
+        .neq("sender_id", currentUser.id)
+        .order("created_at", { ascending: false })
+        .limit(50)
+      : Promise.resolve({ data: [], error: null }),
     db
       .from("admin_private_messages")
       .select("id,complaint_id,body,created_at")
@@ -226,10 +231,11 @@ async function initialize() {
     app.innerHTML = `<article class="support-card"><h1>Support is unavailable</h1><p>SPRK account service is not configured.</p></article>`;
     return;
   }
-  db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  db = getPrimarySupabaseClient();
   const { data, error } = await db.auth.getSession();
   if (error) throw error;
   currentUser = data.session?.user || null;
+  appDataDb = isAppDataConfigured() && data.session ? getAppDataSupabaseClient(data.session) : null;
   if (currentUser) {
     const { data: adminResult, error: adminError } = await db.rpc("is_sprk_admin");
     if (adminError) throw adminError;

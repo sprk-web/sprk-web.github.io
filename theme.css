@@ -57,6 +57,107 @@ body {
   text-rendering: optimizeLegibility;
 }
 
+.app-dialog {
+  width: min(440px, calc(100vw - 32px));
+  max-height: min(84vh, 720px);
+  padding: 0;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--app-shadow);
+}
+
+.app-dialog::backdrop {
+  background: rgb(15 15 20 / 52%);
+  backdrop-filter: blur(3px);
+}
+
+.app-dialog-panel {
+  display: grid;
+  gap: 16px;
+  padding: 24px;
+}
+
+.app-dialog-panel h2 {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 750;
+}
+
+.app-dialog-message {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+
+.app-dialog-input {
+  width: 100%;
+  min-height: 42px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: var(--surface-soft);
+  color: var(--ink);
+  font: inherit;
+}
+
+.app-dialog-input:where(textarea) {
+  min-height: 104px;
+  resize: vertical;
+}
+
+.app-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 9px;
+}
+
+.app-dialog-button {
+  min-height: 40px;
+  padding: 8px 15px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: var(--surface-soft);
+  color: var(--ink);
+  font: inherit;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.app-dialog-confirm {
+  border-color: var(--app-accent);
+  background: var(--app-accent);
+  color: #fff;
+}
+
+.app-dialog-confirm.danger {
+  border-color: #dc2626;
+  background: #dc2626;
+}
+
+.app-dialog-button:hover {
+  filter: brightness(.96);
+}
+
+.community-preset-fieldset {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  color: var(--ink);
+  font-size: .85rem;
+  font-weight: 650;
+}
+
+.community-preset-fieldset .image-preset-option img {
+  width: 48px;
+  height: 48px;
+}
+
 body[data-theme="dark"] {
   color-scheme: dark;
   --surface: #1b1c21;
@@ -897,7 +998,7 @@ main th {
 
 .home-feature-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 18px;
 }
 
@@ -952,6 +1053,25 @@ main th {
 
 .feature-personalize .feature-art {
   background: linear-gradient(135deg, #71a18d, #5c837b 58%, #777c70);
+}
+
+.feature-preptrack .feature-art {
+  background: linear-gradient(135deg, #476d81, #496779 58%, #3b5068);
+}
+
+.feature-preptrack .feature-orbit {
+  width: 138px;
+  height: 138px;
+}
+
+body[data-theme="dark"] .feature-preptrack .feature-art {
+  background: linear-gradient(135deg, #294253, #34465c 58%, #343950);
+}
+
+@media (max-width: 900px) {
+  .home-feature-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .feature-orbit {

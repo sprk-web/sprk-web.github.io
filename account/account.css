@@ -23,6 +23,56 @@ html {
   box-shadow: var(--app-shadow);
 }
 
+.account-preset-fieldset {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.account-preset-fieldset legend {
+  margin-bottom: 10px;
+}
+
+.image-preset-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(74px, 1fr));
+  gap: 10px;
+}
+
+.image-preset-option {
+  display: grid;
+  justify-items: center;
+  gap: 5px;
+  padding: 7px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--muted);
+  font: inherit;
+  font-size: .7rem;
+  cursor: pointer;
+}
+
+.image-preset-option img {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.image-preset-option[aria-pressed="true"] {
+  border-color: var(--app-accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--app-accent) 22%, transparent);
+  color: var(--ink);
+}
+
+.image-preset-option:focus-visible {
+  outline: 2px solid var(--app-accent);
+  outline-offset: 2px;
+}
+
 .account-guest {
   display: grid;
   grid-template-columns: minmax(260px, .82fr) minmax(0, 1.18fr);

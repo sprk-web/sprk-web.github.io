@@ -1,4 +1,5 @@
 import { escapeHtml, formatDate, renderAdminNavigation, requireAdmin, showAdminError } from "../admin-common.js";
+import { alertDialog } from "../../js/dialogs.js";
 
 const app = document.querySelector("#admin-app");
 const maxRows = 5000;
@@ -296,10 +297,10 @@ function csvCell(value) {
   return `"${text.replace(/"/g, '""')}"`;
 }
 
-function exportCsv() {
+async function exportCsv() {
   const rows = filteredEvents();
   if (!rows.length) {
-    window.alert("There are no matching traffic events to export.");
+    await alertDialog("There are no matching traffic events to export.", { title: "Nothing to export" });
     return;
   }
   const header = ["Time", "Page", "Device", "Region", "Referrer"];

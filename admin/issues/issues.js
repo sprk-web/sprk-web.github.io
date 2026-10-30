@@ -54,17 +54,29 @@ function showFeedback(message, isError = false) {
 }
 
 function showLoadError(error) {
-  showAdminError(app, `Could not load simulation issues: ${error.message}`);
+  const message = /no suitable key|wrong key type/i.test(error?.message || "")
+    ? `${error.message} The configured app-data URL and publishable key were verified. In app-data Authentication → Sign In / Providers → Third-Party Auth, add a Custom OIDC provider with issuer https://esknzhyvlzxxgylkczyl.supabase.co/auth/v1.`
+    : error.message;
+  const incompatibleToken = /current SPRK session uses|issuer does not match|has role/i.test(error?.message || "");
+  const detail = incompatibleToken
+    ? "The main account’s profiles.is_admin check passed. The SPRK session token itself is incompatible with app-data authentication; the admin flag cannot change its issuer, signing algorithm, or role claim."
+    : /no suitable key|wrong key type/i.test(error?.message || "")
+      ? "The main account’s profiles.is_admin check passed. Confirm the current session token uses ES256 with a kid, then verify the app-data project's Custom OIDC provider is configured for the main SPRK issuer."
+      : undefined;
+  showAdminError(app, `Could not load simulation issues: ${message}`, undefined, detail);
 }
 
 async function loadIssues() {
+  if (!context.appDataDb) {
+    throw new Error("The SPRK app-data database is not configured for simulation moderation.");
+  }
   const [issueResult] = await Promise.all([
-    context.db.from("issues").select("id,issue_type,simulation_id,owner_user_id,title,summary,report_count,viewer_count,report_rate,status,created_at,simulations(title,status)").not("simulation_id", "is", null).order("created_at", { ascending: false }).limit(100),
+    context.appDataDb.from("issues").select("id,issue_type,simulation_id,owner_user_id,title,summary,report_count,viewer_count,report_rate,status,created_at,simulations(title,status)").not("simulation_id", "is", null).order("created_at", { ascending: false }).limit(100),
   ]);
   if (issueResult.error) throw issueResult.error;
   const simulationIds = [...new Set((issueResult.data || []).map((issue) => issue.simulation_id).filter(Boolean))];
   const reportResult = simulationIds.length
-    ? await context.db.from("simulation_reports").select("simulation_id,reason,details,created_at").in("simulation_id", simulationIds).order("created_at", { ascending: false }).limit(500)
+    ? await context.appDataDb.from("simulation_reports").select("simulation_id,reason,details,created_at").in("simulation_id", simulationIds).order("created_at", { ascending: false }).limit(500)
     : { data: [], error: null };
   if (reportResult.error) throw reportResult.error;
   const reportsBySimulation = new Map();
@@ -84,8 +96,8 @@ async function handleIssueAction(event) {
   button.disabled = true;
   try {
     const result = statusButton
-      ? await context.db.rpc("admin_set_issue_status", { target_issue_id: statusButton.dataset.issue, next_status: statusButton.dataset.status })
-      : await context.db.rpc("admin_hide_simulation", { target_issue_id: hideButton.dataset.hide });
+      ? await context.appDataDb.rpc("admin_set_issue_status", { target_issue_id: statusButton.dataset.issue, next_status: statusButton.dataset.status })
+      : await context.appDataDb.rpc("admin_hide_simulation", { target_issue_id: hideButton.dataset.hide });
     if (result.error) throw result.error;
     await loadIssues();
     showFeedback(statusButton ? `Issue marked ${statusButton.dataset.status}.` : "Simulation hidden and issue moved to review.");
@@ -102,7 +114,7 @@ async function handleMessageSubmit(event) {
   const button = form.querySelector('button[type="submit"]');
   button.disabled = true;
   try {
-    const { error } = await context.db.rpc("admin_reply_to_issue", {
+    const { error } = await context.appDataDb.rpc("admin_reply_to_issue", {
       target_issue_id: form.dataset.messageForm,
       message_body: form.elements.body.value.trim(),
     });

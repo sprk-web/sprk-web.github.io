@@ -1,13 +1,15 @@
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from "../js/config.js";
+import { PRESET_PROFILE_IMAGES } from "../js/profile-images.js";
 
 const app = document.querySelector("#account-app");
 const clientUrl = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2";
+const allowedReturnPathPrefixes = ["/simulator/", "/support/", "/community/", "/preptrack/", "/syllabus_tracker/", "/quests/", "/updates/", "/theme/", "/admin/"];
 const accountReturnPath = (() => {
   const requestedPath = new URLSearchParams(location.search).get("return");
   if (!requestedPath) return null;
   try {
     const destination = new URL(requestedPath, location.origin);
-    if (destination.origin !== location.origin || !["/simulator/", "/support/", "/community/"].some((prefix) => destination.pathname.startsWith(prefix))) return null;
+    if (destination.origin !== location.origin || !allowedReturnPathPrefixes.some((prefix) => destination.pathname === prefix || destination.pathname.startsWith(prefix))) return null;
     return `${destination.pathname}${destination.search}${destination.hash}`;
   } catch {
     return null;
@@ -153,6 +155,10 @@ function render(user = null, profile = {}) {
                   <span class="account-field-hint">JPEG, PNG, or WebP. Resized and compressed before upload; maximum 10 MB.</span>
                 </span>
               </div>
+              <fieldset class="account-preset-fieldset">
+                <legend class="account-field">Or choose a default picture</legend>
+                <div class="image-preset-grid">${PRESET_PROFILE_IMAGES.map(({ label, url }) => `<button class="image-preset-option account-preset-option" type="button" data-preset-avatar="${escapeHtml(url)}" aria-label="${label}" aria-pressed="${profile.avatar_url === url}"><img src="${escapeHtml(url)}" alt=""><span>${label}</span></button>`).join("")}</div>
+              </fieldset>
               <label class="account-field" for="display-name">Display name
                 <input id="display-name" name="display_name" maxlength="80" value="${escapeHtml(displayName)}" placeholder="How should we address you?">
               </label>
@@ -369,6 +375,24 @@ function render(user = null, profile = {}) {
   const fileInput = document.querySelector("#avatar-file");
   const avatarPreview = document.querySelector("#avatar-upload-preview");
   const savedAvatarMarkup = avatarPreview.innerHTML;
+  let selectedPresetAvatar = null;
+  const setPresetAvatar = (url) => {
+    selectedPresetAvatar = url;
+    compressedAvatar = null;
+    fileInput.value = "";
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    previewUrl = null;
+    avatarPreview.innerHTML = `<img src="${escapeHtml(url)}" alt="Selected default profile picture">`;
+    document.querySelector("#avatar-file-name").textContent = "Default picture selected";
+    document.querySelectorAll("[data-preset-avatar]").forEach((button) => {
+      button.setAttribute("aria-pressed", String(button.dataset.presetAvatar === url));
+    });
+    updateProfileStrength();
+    showMessage("Default picture selected. Save your profile to apply it.", "info");
+  };
+  form.querySelectorAll("[data-preset-avatar]").forEach((button) => {
+    button.addEventListener("click", () => setPresetAvatar(button.dataset.presetAvatar));
+  });
   fileInput.onchange = async () => {
     compressedAvatar = null;
     const file = fileInput.files?.[0];
@@ -376,18 +400,24 @@ function render(user = null, profile = {}) {
     document.querySelector("#avatar-file-name").textContent = file.name;
     try {
       compressedAvatar = await compressAvatar(file);
+      selectedPresetAvatar = null;
+      document.querySelectorAll("[data-preset-avatar]").forEach((button) => button.setAttribute("aria-pressed", "false"));
       if (previewUrl) URL.revokeObjectURL(previewUrl);
       previewUrl = URL.createObjectURL(compressedAvatar);
       avatarPreview.innerHTML = `<img src="${previewUrl}" alt="Compressed profile picture preview">`;
       document.querySelector("#avatar-file-name").textContent = `${file.name} · ${Math.ceil(compressedAvatar.size / 1024)} KB`;
+      updateProfileStrength();
       showMessage("Picture ready to upload when you save your profile.", "info");
     } catch (error) {
       if (previewUrl) URL.revokeObjectURL(previewUrl);
       previewUrl = null;
-      avatarPreview.innerHTML = savedAvatarMarkup;
+      avatarPreview.innerHTML = selectedPresetAvatar
+        ? `<img src="${escapeHtml(selectedPresetAvatar)}" alt="Selected default profile picture">`
+        : savedAvatarMarkup;
       showMessage(error.message, "error");
       document.querySelector("#avatar-file-name").textContent = "No photo selected";
       fileInput.value = "";
+      updateProfileStrength();
     }
   };
 
@@ -403,7 +433,7 @@ function render(user = null, profile = {}) {
     const checks = [
       ["display_name", Boolean(document.querySelector("#display-name").value.trim())],
       ["bio", Boolean(bioInput.value.trim())],
-      ["avatar", Boolean(compressedAvatar || profile.avatar_url)],
+      ["avatar", Boolean(compressedAvatar || selectedPresetAvatar || profile.avatar_url)],
     ];
     const complete = checks.filter(([, done]) => done).length;
     const percent = Math.round((complete / checks.length) * 100);
@@ -426,7 +456,7 @@ function render(user = null, profile = {}) {
     event.preventDefault();
     const formData = new FormData(form);
     const avatarPath = compressedAvatar ? `${user.id}/${crypto.randomUUID()}.jpg` : null;
-    let uploadedAvatarUrl = profile.avatar_url || null;
+    let uploadedAvatarUrl = selectedPresetAvatar || profile.avatar_url || null;
     setBusy(form, true, "Saving changes…");
     showMessage("Saving your profile…", "info");
     try {
@@ -457,7 +487,7 @@ function render(user = null, profile = {}) {
       }
 
       let cleanupNotice = "";
-      if (compressedAvatar) {
+      if (compressedAvatar || selectedPresetAvatar) {
         const oldAvatarPath = avatarPathFromUrl(profile.avatar_url);
         if (oldAvatarPath && oldAvatarPath !== avatarPath) {
           const { error: removeError } = await db.storage.from("avatars").remove([oldAvatarPath]);

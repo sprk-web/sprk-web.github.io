@@ -7,21 +7,30 @@ export const SITE_CONFIG = {
     updates: "Updates - SPRK-Web",
     support: "Contact support - SPRK-Web",
     community: "Community - SPRK-Web",
+    syllabus_tracker: "Syllabus Tracker - SPRK-Web",
+    question_log: "Error Question Log - SPRK-Web",
+    quests: "Daily Goals - SPRK-Web",
     admin: "SPRK Admin",
     theme: "Theme & personalization - SPRK WEB",
     notFound: "Page not found - SPRK-Web",
   },
   navigation: [
     { key: "home", label: "Home", icon: "house", path: "./" },
-    { key: "simulations", label: "Simulations", icon: "orbit", path: "simulator/" },
+    { key: "simulations", label: "Simulations", icon: "atom", path: "simulator/" },
     { key: "updates", label: "Updates", icon: "bell", path: "updates/" },
-    { key: "community", label: "Community", icon: "users-round", path: "community/" },
+    { key: "syllabus_tracker", label: "Syllabus Tracker", icon: "book-check", path: "syllabus_tracker/" },
+    { key: "question_log", label: "Error Log", icon: "notebook-pen", path: "error_log/" },
+    { key: "quests", label: "Daily Goals", icon: "list-todo", path: "quests/" },
+    { key: "community", label: "Community", icon: "messages-circle", path: "community/" },
   ],
   searchPages: [
     { label: "Home", title: "SPRK-Web", path: "./", terms: ["start", "homepage", "learning", "explore"] },
     { label: "Simulations", title: "Explore simulations", path: "simulator/", terms: ["simulator", "physics", "experiments", "learning lab"] },
     { label: "Updates", title: "What’s new", path: "updates/", terms: ["news", "announcements", "releases", "posts"] },
-    { label: "Community", title: "Community chat", path: "community/", terms: ["groups", "chat", "communities", "inbox"] },
+    { label: "Community", title: "Public study forums", path: "community/", terms: ["study forum", "groups", "discussion", "questions", "communities"] },
+    { label: "Syllabus Tracker", title: "JEE syllabus progress", path: "syllabus_tracker/", terms: ["jee", "jee mains", "jee advanced", "syllabus", "checkpoints", "revision", "prep", "ascent"] },
+    { label: "Error Question Log", title: "Review and organize difficult questions", path: "error_log/", terms: ["error log", "question log", "mistakes", "priority", "difficulty", "revision"] },
+    { label: "Daily Goals", title: "Study goals and leaderboard", path: "quests/", terms: ["daily goals", "planner", "study tasks", "focus timer", "leaderboard", "xp", "quests"] },
     { label: "Contact Us", title: "Contact SPRK support", path: "support/", terms: ["complaint", "help", "support ticket", "report a problem"] },
     { label: "Your account", title: "Your account", path: "account/", terms: ["profile", "sign in", "login", "member"] },
     { label: "Theme", title: "Theme & personalization", path: "theme/", terms: ["settings", "appearance", "colors", "personalize"] },
@@ -35,7 +44,7 @@ export const SITE_CONFIG = {
     personalSectionTitle: "Your space",
     personalLinks: [
       { key: "account", label: "Your account", icon: "user-round", path: "account/" },
-      { key: "support", label: "Contact support", icon: "life-buoy", path: "support/" },
+      { key: "support", label: "Contact support", icon: "shield-user", path: "support/" },
     ],
     personalizationTitle: "Personalization",
     personalizationLinks: [
@@ -146,17 +155,16 @@ export const SIMULATOR_CONFIG = {
 // Browser-facing configuration only. Never put a service-role or secret key here.
 export const SUPABASE_PROJECTS = {
   main: {
-    url: "https://eliwtvmovfykydbhbgvs.supabase.co",
-    anonKey: "sb_publishable_TrXEA94Ci3GzcVHf-votMw_0Yxrl-BT",
+    url: "https://esknzhyvlzxxgylkczyl.supabase.co",
+    anonKey: "sb_publishable_EvzkMnOeun31lX40-_pkBA_q2Nyuj4-",
   },
-  simulator: {
-    url: "https://owguhymyzrwawibzetxd.supabase.co",
-    anonKey: "sb_publishable_43f9RoG0zdAtfS8_h5B4KQ_o2gm8MbO",
+  appData: {
+    url: "https://zbtmfqxdumwwabigcumv.supabase.co",
+    anonKey: "sb_publishable_tbmZiB9hqcQ80v1MHfZqwg_HaQXstcO",
   },
 };
 
-export const ADMIN_EMAILS = ["shashankkk16@gmail.com"];
 export const SUPABASE_URL = SUPABASE_PROJECTS.main.url;
 export const SUPABASE_ANON_KEY = SUPABASE_PROJECTS.main.anonKey;
-export const SIMULATOR_SUPABASE_URL = SUPABASE_PROJECTS.simulator.url;
-export const SIMULATOR_SUPABASE_ANON_KEY = SUPABASE_PROJECTS.simulator.anonKey;
+export const APP_DATA_SUPABASE_URL = SUPABASE_PROJECTS.appData.url;
+export const APP_DATA_SUPABASE_ANON_KEY = SUPABASE_PROJECTS.appData.anonKey;
