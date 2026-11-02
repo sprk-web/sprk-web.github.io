@@ -78,14 +78,43 @@ function resetForm() {
 
 async function syncCatalog() {
   if (!isAppDataConfigured()) throw new Error("App-data Supabase is not configured.");
-  const appData = getAppDataSupabaseClient(context.session);
+  const { data, error } = await context.db.auth.getSession();
+  if (error) throw error;
+  let session = data.session;
+  if (!session) throw new Error("Your sign-in session has expired. Sign in again before synchronizing the theme-effect catalog.");
+  if (session.expires_at && session.expires_at <= Math.floor(Date.now() / 1000) + 60) {
+    const { data: refreshed, error: refreshError } = await context.db.auth.refreshSession();
+    if (refreshError) throw refreshError;
+    session = refreshed.session;
+    if (!session) throw new Error("Your sign-in session has expired. Sign in again before synchronizing the theme-effect catalog.");
+  }
+  context.session = session;
+  const appData = getAppDataSupabaseClient(session);
   if (!appData) throw new Error("The app-data Supabase client is unavailable.");
-  const { error } = await appData.rpc("sync_theme_effect_catalog", {
+  const { error: syncError } = await appData.rpc("sync_theme_effect_catalog", {
     p_effects: effects.map(({ id, name, category, description, css_code, keyframes_code, price, premium_only, published }) => ({
       id, name, category, description, css_code, keyframes_code, price, premium_only, published,
     })),
   });
+  if (syncError) throw syncError;
+}
+
+async function saveEffectToDatabase(effect) {
+  const save = () => context.db.from("theme_effects").upsert({
+    ...effect,
+    created_by: context.user.id,
+    updated_at: new Date().toISOString(),
+  }, { onConflict: "id" });
+  let result = await save();
+  if (!result.error || !/jwt expired/i.test(result.error.message || "")) return result;
+
+  const { data, error } = await context.db.auth.refreshSession();
   if (error) throw error;
+  if (!data.session) throw new Error("Your sign-in session has expired. Sign in again before saving the effect.");
+  context.session = data.session;
+  context.user = data.session.user;
+  result = await save();
+  return result;
 }
 
 async function loadEffects() {
@@ -130,18 +159,20 @@ async function saveEffect(event) {
     }
   }
   try {
-    const { error } = await context.db.from("theme_effects").upsert({
-      ...effect,
-      created_by: context.user.id,
-      updated_at: new Date().toISOString(),
-    }, { onConflict: "id" });
+    const { error } = await saveEffectToDatabase(effect);
     if (error) throw error;
-    await loadEffects();
-    showFeedback("Effect saved and synchronized to the Study Credits catalog.");
-    resetForm();
   } catch (error) {
     showFeedback(`Could not save the effect: ${error.message}`, true);
+    return;
   }
+  try {
+    await loadEffects();
+  } catch (error) {
+    showFeedback(`Effect was saved, but its list or catalog could not be refreshed: ${error.message}`, true);
+    return;
+  }
+  showFeedback("Effect saved and synchronized to the Study Credits catalog.");
+  resetForm();
 }
 
 async function handleEffectAction(event) {

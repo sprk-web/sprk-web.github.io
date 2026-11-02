@@ -201,7 +201,7 @@ import { initializeUpdatesIndicator } from "./update-notifications.js";
     const link = linksByKey.get(anchor.dataset.siteLink);
     if (link) anchor.href = appUrl(link.path);
   });
-  main.classList.add("min-h-screen", "bg-white", "transition-[margin]", "duration-200");
+  main.classList.add("min-h-screen", "bg-white", "transition-[margin,width]", "duration-200");
   const updateMainTopOffset = () => {
     if (SITE_CONFIG.controls.stickyHeader) {
       main.style.marginTop = mobileLayout.matches ? "3.5rem" : "4rem";
@@ -217,6 +217,11 @@ import { initializeUpdatesIndicator } from "./update-notifications.js";
   const sidebarElement = document.querySelector("#sidebar");
   const sidebarBackdropElement = document.querySelector("#sidebar-backdrop");
   const compactLayout = window.matchMedia("(max-width: 900px)");
+
+  const setMainLeftOffset = (offset) => {
+    main.style.marginLeft = offset;
+    main.style.width = `calc(100% - ${offset})`;
+  };
 
   function setSidebarState() {
     if (!mobileLayout.matches) document.body.classList.remove("mobile-sidebar-open");
@@ -236,7 +241,7 @@ import { initializeUpdatesIndicator } from "./update-notifications.js";
     if (mobileLayout.matches) {
       sidebarElement.style.width = "min(288px, calc(100vw - 56px))";
       sidebarElement.style.transform = mobileOpen ? "translateX(0)" : "translateX(-100%)";
-      main.style.marginLeft = "0";
+      setMainLeftOffset("0px");
       if (sidebarBackdropElement) sidebarBackdropElement.hidden = !mobileOpen;
       return;
     }
@@ -244,14 +249,14 @@ import { initializeUpdatesIndicator } from "./update-notifications.js";
     if (sidebarBackdropElement) sidebarBackdropElement.hidden = true;
     if (compactLayout.matches) {
       sidebarElement.style.width = "76px";
-      main.style.marginLeft = collapsed ? "0" : "76px";
+      setMainLeftOffset(collapsed ? "0px" : "76px");
       sidebarElement.classList.toggle("-translate-x-full", collapsed);
       return;
     }
 
     sidebarElement.classList.remove("-translate-x-full");
     sidebarElement.style.width = collapsed ? "76px" : "256px";
-    main.style.marginLeft = collapsed ? "76px" : "256px";
+    setMainLeftOffset(collapsed ? "76px" : "256px");
   }
 
   menuToggles.forEach((button) => button.addEventListener("click", () => {

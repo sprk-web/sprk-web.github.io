@@ -347,7 +347,7 @@ function render(user = null, profile = {}, contributionStats = null) {
           if (method === "signUp" && !authData.session) {
             form.reset();
             selectTab("signin");
-            showMessage("Your account is ready. Check your email for a confirmation link.");
+            showMessage("We sent a confirmation email to your inbox. Please follow its link to confirm your email address and activate your account.");
           } else if (accountReturnPath) {
             location.assign(accountReturnPath);
           } else {

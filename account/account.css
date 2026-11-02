@@ -834,8 +834,9 @@ html {
 }
 
 #account-app {
-  max-width: 1320px;
-  margin: 0 auto;
+  width: 100%;
+  max-width: none;
+  margin: 0;
   padding: clamp(24px, 4vw, 48px) clamp(18px, 4vw, 54px) 72px;
 }
 
@@ -1235,5 +1236,62 @@ html {
   .account-gift-link-row {
     align-items: stretch;
     flex-direction: column;
+  }
+}
+
+@media (max-width: 620px) {
+  #account-app {
+    padding-top: 16px;
+    padding-bottom: 24px;
+  }
+
+  #account-app > section.account-guest > div.account-welcome {
+    padding: 18px 20px;
+  }
+
+  .account-welcome-copy {
+    margin-top: 14px;
+  }
+
+  .account-welcome p {
+    margin-top: 8px;
+  }
+
+  .account-benefit-list {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    margin-top: 14px;
+    font-size: .68rem;
+  }
+
+  .account-benefit-list li {
+    align-items: flex-start;
+    gap: 5px;
+  }
+
+  .account-benefit-list li i {
+    flex: 0 0 auto;
+    width: 14px;
+    height: 14px;
+  }
+
+  .account-auth {
+    padding: 18px;
+  }
+
+  .account-tabs {
+    margin-bottom: 16px;
+  }
+
+  .account-auth-form {
+    gap: 12px;
+  }
+
+  .account-status {
+    margin-top: 12px;
+  }
+
+  .account-privacy-note {
+    margin-top: 10px;
   }
 }

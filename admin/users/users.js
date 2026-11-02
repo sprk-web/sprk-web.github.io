@@ -118,7 +118,7 @@ async function handleAction(event) {
   if (premiumButton) {
     const user = users.find((item) => item.id === premiumButton.dataset.premiumUserId);
     if (!user) return;
-    await changePremium(user, premiumButton.dataset.premium === "true");
+    await changePremium(user, premiumButton.dataset.premium !== "true");
     return;
   }
   const button = event.target.closest("[data-user-id]");
