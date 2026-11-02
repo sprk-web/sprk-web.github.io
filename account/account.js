@@ -1,9 +1,10 @@
-import { SUPABASE_URL, SUPABASE_ANON_KEY } from "../js/config.js";
+import { CONTRIBUTION_CONFIG, SUPABASE_URL, SUPABASE_ANON_KEY } from "../js/config.js";
 import { PRESET_PROFILE_IMAGES } from "../js/profile-images.js";
+import { getAppDataSupabaseClient, isAppDataConfigured } from "../js/appDataSupabaseClient.js";
 
 const app = document.querySelector("#account-app");
 const clientUrl = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2";
-const allowedReturnPathPrefixes = ["/simulator/", "/support/", "/community/", "/preptrack/", "/syllabus_tracker/", "/quests/", "/updates/", "/theme/", "/admin/"];
+const allowedReturnPathPrefixes = ["/simulator/", "/resources/", "/support/", "/community/", "/preptrack/", "/syllabus_tracker/", "/quests/", "/updates/", "/theme/", "/admin/"];
 const accountReturnPath = (() => {
   const requestedPath = new URLSearchParams(location.search).get("return");
   if (!requestedPath) return null;
@@ -110,9 +111,10 @@ function passwordMarkup(id, name, label, autocomplete, required = true) {
   </div>`;
 }
 
-function render(user = null, profile = {}) {
+function render(user = null, profile = {}, contributionStats = null) {
   const displayName = profile.display_name || "";
   const initial = (displayName || user?.email || "S").slice(0, 1).toUpperCase();
+  const giftCode = new URLSearchParams(location.search).get("gift") || "";
   const avatar = profile.avatar_url
     ? `<img src="${escapeHtml(profile.avatar_url)}" alt="Profile picture">`
     : `<span aria-hidden="true">${escapeHtml(initial)}</span>`;
@@ -120,8 +122,9 @@ function render(user = null, profile = {}) {
   app.innerHTML = `<section class="account-page">
     <h1 class="sr-only">${user ? "Your account" : "Sign in to your account"}</h1>
     ${user ? `
-      <section class="account-panel">
+      <section class="account-panel account-dashboard">
         <div class="account-profile-header">
+          <div class="account-header-copy"><span class="account-header-eyebrow">YOUR SPRK SPACE</span>
           <div class="account-identity">
             <div id="avatar-frame" class="account-avatar">${avatar}</div>
             <div>
@@ -133,14 +136,31 @@ function render(user = null, profile = {}) {
               </span>
             </div>
           </div>
+          </div>
           <span class="account-field-hint">Member since ${user.created_at ? new Date(user.created_at).toLocaleDateString(undefined, { month: "short", year: "numeric" }) : "recently"}</span>
         </div>
 
+        <section class="account-wallet-card" aria-label="Contribution rewards">
+          <div class="account-wallet-stat account-currency-stat"><span class="account-wallet-icon"><i data-lucide="coins" class="h-5 w-5"></i></span><span class="account-wallet-label">YOUR BALANCE</span><strong>${contributionStats && !contributionStats.error ? Number(contributionStats.balance).toLocaleString() : "—"}</strong><span>${escapeHtml(CONTRIBUTION_CONFIG.currencyName)} available</span></div>
+          <div class="account-wallet-stat account-xp-stat"><span class="account-wallet-icon"><i data-lucide="sparkles" class="h-5 w-5"></i></span><span class="account-wallet-label">LEARNING XP</span><strong>${contributionStats && !contributionStats.error ? Number(contributionStats.totalXp).toLocaleString() : "—"}</strong><span>Keep building momentum</span></div>
+          ${contributionStats?.error ? `<p role="status">${escapeHtml(contributionStats.error)}</p>` : ""}
+          <div class="account-wallet-note"><i data-lucide="gift" class="h-4 w-4"></i><span>Earn rewards by sharing simulations and useful study resources.</span><a href="../resources/">Explore library</a></div>
+        </section>
+        <section class="account-redeem-card">
+          <div class="account-redeem-heading"><span class="account-icon-tile"><i data-lucide="ticket-check" class="h-5 w-5"></i></span><div><h3>Redeem a gift code</h3><p>Have a Study Credits gift link or code? Add it to your balance here.</p></div></div>
+          <form id="gift-redeem-form" class="account-gift-form">
+            <label class="account-field" for="gift-code">Gift code<input id="gift-code" name="gift_code" maxlength="128" value="${escapeHtml(giftCode)}" placeholder="Paste your gift code" autocomplete="off" required></label>
+            <button class="account-primary-button" type="submit"><i data-lucide="gift" class="h-4 w-4"></i> Redeem credits</button>
+          </form>
+          <p id="gift-status" class="account-status" role="status" aria-live="polite"></p>
+        </section>
         <div class="account-profile-body">
-          <div class="account-profile-main">
-            <div>
-              <h3 class="account-section-title">Profile details</h3>
+          <div class="account-profile-main account-section-card">
+            <div class="account-section-heading">
+              <span class="account-icon-tile"><i data-lucide="user-round-cog" class="h-5 w-5"></i></span>
+              <div><h3 class="account-section-title">Personalize your profile</h3>
               <p class="account-section-copy">Add a name and a little about yourself so your profile feels like yours.</p>
+              </div>
             </div>
             <form id="profile-form" class="account-profile-form">
               <div class="account-upload">
@@ -157,7 +177,7 @@ function render(user = null, profile = {}) {
               </div>
               <fieldset class="account-preset-fieldset">
                 <legend class="account-field">Or choose a default picture</legend>
-                <div class="image-preset-grid">${PRESET_PROFILE_IMAGES.map(({ label, url }) => `<button class="image-preset-option account-preset-option" type="button" data-preset-avatar="${escapeHtml(url)}" aria-label="${label}" aria-pressed="${profile.avatar_url === url}"><img src="${escapeHtml(url)}" alt=""><span>${label}</span></button>`).join("")}</div>
+                <div class="image-preset-grid">${PRESET_PROFILE_IMAGES.map(({ label, url, legacyUrl }) => `<button class="image-preset-option account-preset-option" type="button" data-preset-avatar="${escapeHtml(url)}" aria-label="${label}" aria-pressed="${profile.avatar_url === url || profile.avatar_url === legacyUrl}"><img src="${escapeHtml(url)}" alt="" loading="lazy" decoding="async" width="52" height="52"><span>${label}</span></button>`).join("")}</div>
               </fieldset>
               <label class="account-field" for="display-name">Display name
                 <input id="display-name" name="display_name" maxlength="80" value="${escapeHtml(displayName)}" placeholder="How should we address you?">
@@ -170,7 +190,7 @@ function render(user = null, profile = {}) {
             </form>
           </div>
 
-          <aside class="account-profile-sidebar">
+          <aside class="account-profile-sidebar account-completion-card">
             <div>
               <div class="account-progress-header"><strong>Profile strength</strong><span id="profile-completion-value"></span></div>
               <div class="account-progress-track" role="progressbar" aria-label="Profile completeness" aria-valuemin="0" aria-valuemax="100">
@@ -369,6 +389,41 @@ function render(user = null, profile = {}) {
     return;
   }
 
+  const redeemForm = document.querySelector("#gift-redeem-form");
+  redeemForm.onsubmit = async (event) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const button = form.querySelector('button[type="submit"]');
+    const status = document.querySelector("#gift-status");
+    const code = String(new FormData(form).get("gift_code") || "").trim();
+    button.disabled = true;
+    status.textContent = "Redeeming gift…";
+    status.dataset.kind = "info";
+    try {
+      const { data: sessionData, error: sessionError } = await db.auth.getSession();
+      if (sessionError) throw sessionError;
+      const appData = getAppDataSupabaseClient(sessionData.session);
+      const { data, error } = await appData.rpc("redeem_contribution_gift", { p_code: code });
+      if (error) throw error;
+      status.textContent = `${Number(data)} ${CONTRIBUTION_CONFIG.currencyName} added to your balance.`;
+      status.dataset.kind = "success";
+      const nextUrl = new URL(location.href);
+      nextUrl.searchParams.delete("gift");
+      history.replaceState(history.state, "", `${nextUrl.pathname}${nextUrl.search}${nextUrl.hash}`);
+      window.setTimeout(() => location.reload(), 900);
+    } catch (error) {
+      console.error("Could not redeem the contribution gift.", error);
+      status.textContent = error.message || "This gift could not be redeemed.";
+      status.dataset.kind = "error";
+      button.disabled = false;
+    }
+  };
+  if (/^(?:[0-9a-fA-F]{48}|[A-Za-z0-9][A-Za-z0-9_-]{3,31})$/.test(giftCode)) {
+    document.querySelector("#gift-status").textContent = "Redeeming your gift link…";
+    document.querySelector("#gift-status").dataset.kind = "info";
+    window.setTimeout(() => redeemForm.requestSubmit(), 0);
+  }
+
   const form = document.querySelector("#profile-form");
   let compressedAvatar = null;
   let previewUrl = null;
@@ -486,18 +541,38 @@ function render(user = null, profile = {}) {
         throw error;
       }
 
-      let cleanupNotice = "";
-      if (compressedAvatar || selectedPresetAvatar) {
-        const oldAvatarPath = avatarPathFromUrl(profile.avatar_url);
-        if (oldAvatarPath && oldAvatarPath !== avatarPath) {
-          const { error: removeError } = await db.storage.from("avatars").remove([oldAvatarPath]);
-          if (removeError) cleanupNotice = ` Profile saved, but the previous picture could not be removed: ${removeError.message}`;
-        }
-      }
+      const avatarChanged = Boolean(compressedAvatar || selectedPresetAvatar);
+      const oldAvatarPath = avatarPathFromUrl(profile.avatar_url);
       Object.assign(profile, nextProfile);
       compressedAvatar = null;
+      const notices = [];
+      try {
+        const { data: sessionData, error: sessionError } = await db.auth.getSession();
+        if (sessionError) throw sessionError;
+        if (!sessionData.session) throw new Error("Your session expired. Sign in again to sync your leaderboard name.");
+        const appData = getAppDataSupabaseClient(sessionData.session);
+        if (!appData) throw new Error("The app-data project is not configured.");
+        const handle = String(nextProfile.display_name || user.user_metadata?.display_name || user.email?.split("@")[0] || "Learner")
+          .trim().slice(0, 80) || "Learner";
+        const { error: syncError } = await appData.from("tracker_profiles").upsert({
+          user_id: user.id,
+          handle,
+          avatar_url: nextProfile.avatar_url,
+        }, { onConflict: "user_id" });
+        if (syncError) throw syncError;
+      } catch (syncError) {
+        console.error("Profile saved, but the leaderboard profile could not be synced.", syncError);
+        notices.push(`Your profile was saved, but your leaderboard name could not be updated: ${syncError.message || "Unknown error."}`);
+      }
+
+      if (avatarChanged) {
+        if (oldAvatarPath && oldAvatarPath !== avatarPath) {
+          const { error: removeError } = await db.storage.from("avatars").remove([oldAvatarPath]);
+          if (removeError) notices.push(`The previous picture could not be removed: ${removeError.message}`);
+        }
+      }
       render(user, profile);
-      showMessage(cleanupNotice ? cleanupNotice.trim() : "Your profile has been saved.", cleanupNotice ? "error" : "success");
+      showMessage(notices.length ? `Your profile was saved. ${notices.join(" ")}` : "Your profile has been saved.", notices.length ? "error" : "success");
     } catch (error) {
       showMessage(error.message || "Your profile could not be saved. Please try again.", "error");
     } finally {
@@ -550,6 +625,23 @@ function render(user = null, profile = {}) {
   };
 }
 
+async function loadContributionStats(session, userId) {
+  if (!isAppDataConfigured()) {
+    throw new Error("Contribution rewards are unavailable because the app-data project is not configured.");
+  }
+  const appData = getAppDataSupabaseClient(session);
+  const [walletResult, profileResult] = await Promise.all([
+    appData.from("contribution_wallets").select("balance").eq("user_id", userId).maybeSingle(),
+    appData.from("tracker_profiles").select("total_xp").eq("user_id", userId).maybeSingle(),
+  ]);
+  if (walletResult.error) throw walletResult.error;
+  if (profileResult.error) throw profileResult.error;
+  return {
+    balance: walletResult.data?.balance || 0,
+    totalXp: profileResult.data?.total_xp || 0,
+  };
+}
+
 if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
   app.innerHTML = `<section class="account-panel account-error-panel"><h1>Configuration required</h1><p>Add the public Supabase project URL and anon/publishable key in <code>js/config.js</code>.</p></section>`;
 } else {
@@ -560,18 +652,26 @@ if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
       db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
       const { data, error } = await db.auth.getSession();
       if (error) throw error;
-      const user = data.session?.user;
+      const session = data.session;
+      const user = session?.user;
       if (!user) {
         render();
         return;
       }
       const { data: profile, error: profileError } = await db
         .from("profiles")
-        .select("display_name,bio,avatar_url")
+        .select("display_name,bio,avatar_url,is_admin")
         .eq("id", user.id)
         .maybeSingle();
       if (profileError) throw profileError;
-      render(user, profile || {});
+      let contributionStats;
+      try {
+        contributionStats = await loadContributionStats(session, user.id);
+      } catch (statsError) {
+        console.error("Could not load contribution rewards.", statsError);
+        contributionStats = { error: "Could not load rewards. Apply the current app-data schema and check its sign-in configuration." };
+      }
+      render(user, profile || {}, contributionStats);
     } catch (error) {
       app.innerHTML = `<section class="account-panel account-error-panel"><h1>Account unavailable</h1><p>${escapeHtml(error.message || "Could not connect to Supabase.")}</p><p>Check your project URL, key, network connection, and SQL setup.</p></section>`;
     }

@@ -1,5 +1,7 @@
 import { SITE_CONFIG, SUPABASE_ANON_KEY, SUPABASE_URL } from "./config.js";
 import { getPrimarySupabaseClient } from "./supabaseClient.js";
+import { loadSupabaseSdk } from "./loadSupabaseSdk.js";
+import { initializeUpdatesIndicator } from "./update-notifications.js";
 
 (() => {
   const sidebarPreferenceKey = "sprk-sidebar-collapsed";
@@ -25,7 +27,7 @@ import { getPrimarySupabaseClient } from "./supabaseClient.js";
 
   const navLink = ({ key, label, icon, path }, compact = false) => `
     <a class="nav-link flex min-h-10 items-center gap-3 rounded-xl px-3 text-sm no-underline ${compact ? "max-[900px]:min-h-[68px] max-[900px]:flex-col max-[900px]:justify-center max-[900px]:gap-1.5 max-[900px]:px-0 max-[900px]:py-1 max-[900px]:text-[10px]" : ""}" href="${appUrl(path)}" title="${label}"${page === key ? ' aria-current="page"' : ""}>
-      <i data-lucide="${icon}" class="h-6 w-6 shrink-0"></i><span class="nav-label">${label}</span>
+      <span class="nav-icon-wrap"><i data-lucide="${icon}" class="h-6 w-6 shrink-0"></i>${key === "updates" ? '<span class="updates-unread-indicator" data-updates-indicator hidden></span>' : ""}</span><span class="nav-label">${label}</span>
     </a>`;
   const escapeHtml = (value) => String(value ?? "").replace(/[&<>"']/g, (character) => ({
     "&": "&amp;",
@@ -35,23 +37,19 @@ import { getPrimarySupabaseClient } from "./supabaseClient.js";
     "'": "&#39;",
   }[character]));
   const loadHeaderSupabase = async () => {
-    if (window.supabase?.createClient) return;
     if (!SUPABASE_URL || !SUPABASE_ANON_KEY) return;
-    await new Promise((resolve, reject) => {
-      const script = document.createElement("script");
-      script.src = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2";
-      script.onload = resolve;
-      script.onerror = () => reject(new Error("Could not load the account service."));
-      document.head.append(script);
-    });
-    if (!window.supabase?.createClient) throw new Error("The account service did not initialize.");
+    await loadSupabaseSdk();
   };
   let headerProfileRequest = 0;
   const updateHeaderProfile = async (client, user) => {
     const control = document.querySelector("#auth-button");
-    if (!control) return;
+    const brand = document.querySelector(".site-brand");
+    if (!control && !brand) return;
     const requestId = ++headerProfileRequest;
     if (!user) {
+      brand?.classList.remove("is-premium");
+      brand?.removeAttribute("data-theme-effect");
+      if (!control) return;
       control.href = accountHref;
       control.title = "Login / account";
       control.setAttribute("aria-label", headerConfig.accountLabel);
@@ -62,7 +60,7 @@ import { getPrimarySupabaseClient } from "./supabaseClient.js";
 
     const { data: profile, error } = await client
       .from("profiles")
-      .select("display_name,avatar_url")
+      .select("display_name,avatar_url,is_premium,premium_until")
       .eq("id", user.id)
       .maybeSingle();
     if (error) throw error;
@@ -70,6 +68,13 @@ import { getPrimarySupabaseClient } from "./supabaseClient.js";
     if (sessionError) throw sessionError;
     if (requestId !== headerProfileRequest || sessionData.session?.user?.id !== user.id) return;
 
+    const premiumIsActive = Boolean(
+      profile?.is_premium && (!profile.premium_until || new Date(profile.premium_until) > new Date()),
+    );
+    brand?.classList.toggle("is-premium", premiumIsActive);
+    if (premiumIsActive) brand?.setAttribute("data-theme-effect", "sprk-gold-shimmer");
+    else brand?.removeAttribute("data-theme-effect");
+    if (!control) return;
     const label = profile?.display_name || user.email || "Your profile";
     control.href = appUrl("account/");
     control.title = label;
@@ -85,7 +90,8 @@ import { getPrimarySupabaseClient } from "./supabaseClient.js";
   };
   async function initializeHeaderProfile() {
     const control = document.querySelector("#auth-button");
-    if (!control || !SUPABASE_URL || !SUPABASE_ANON_KEY) return;
+    const brand = document.querySelector(".site-brand");
+    if ((!control && !brand) || !SUPABASE_URL || !SUPABASE_ANON_KEY) return;
     await loadHeaderSupabase();
     const client = getPrimarySupabaseClient();
     const { data, error } = await client.auth.getSession();
@@ -119,14 +125,14 @@ import { getPrimarySupabaseClient } from "./supabaseClient.js";
         </button>`
     : "";
   const optionalButton = (show, label, icon) => !show ? "" : label === headerConfig.notificationsLabel
-    ? `<a href="${appUrl("updates/")}" class="grid h-10 w-10 place-items-center rounded-full hover:bg-[#f2f2f2]" aria-label="${label}" title="${label}"><i data-lucide="${icon}" class="h-5 w-5"></i></a>`
+    ? `<a href="${appUrl("updates/")}" class="header-updates-link grid h-10 w-10 place-items-center rounded-full hover:bg-[#f2f2f2]" aria-label="${label}" title="${label}"><i data-lucide="${icon}" class="h-5 w-5"></i><span class="updates-unread-indicator" data-updates-indicator hidden></span></a>`
     : `<button id="theme-cycle" class="grid h-10 w-10 place-items-center rounded-full hover:bg-[#f2f2f2]" type="button" aria-label="Change theme" title="Theme: light, dark, or system"><i data-lucide="sun-moon" class="h-5 w-5"></i></button>`;
 
   const header = `
     <header class="${SITE_CONFIG.controls.stickyHeader ? "fixed" : "absolute"} inset-x-0 top-0 z-50 flex h-16 items-center bg-white px-6 max-[620px]:h-14 max-[620px]:px-3">
       <div class="flex basis-[240px] items-center gap-4 max-[900px]:basis-[185px] max-[620px]:basis-auto max-[620px]:grow max-[620px]:gap-2">
         ${menuButton}
-        <a class="whitespace-nowrap text-[19px] font-extrabold tracking-[-0.8px] text-[#0f0f0f] no-underline max-[620px]:text-[17px]" href="${appUrl("./")}" aria-label="${SITE_CONFIG.name} home">
+        <a class="site-brand whitespace-nowrap text-[19px] font-extrabold tracking-[-0.8px] text-[#0f0f0f] no-underline max-[620px]:text-[17px]" href="${appUrl("./")}" aria-label="${SITE_CONFIG.name} home">
           ${SITE_CONFIG.name}
         </a>
       </div>
@@ -189,6 +195,7 @@ import { getPrimarySupabaseClient } from "./supabaseClient.js";
       </dl>
     </dialog>`;
   main.insertAdjacentHTML("beforebegin", header + (SITE_CONFIG.controls.showSiteMenu ? sidebarBackdrop + sidebar : "") + shortcutsDialog);
+  initializeUpdatesIndicator();
   initializeHeaderProfile().catch((error) => console.error("Could not load the signed-in profile for the header.", error));
   document.querySelectorAll("[data-site-link]").forEach((anchor) => {
     const link = linksByKey.get(anchor.dataset.siteLink);
@@ -376,11 +383,17 @@ import { getPrimarySupabaseClient } from "./supabaseClient.js";
   try {
     const savedTheme = JSON.parse(localStorage.getItem(SITE_CONFIG.theme.storageKey) || "{}");
     const themeButton = document.querySelector("#theme-cycle");
-    if (themeButton && savedTheme.appearance) {
-      themeButton.setAttribute("aria-label", `Theme: ${savedTheme.appearance}`);
-      themeButton.setAttribute("title", `Theme: ${savedTheme.appearance} (click to change)`);
+    const appearance = SITE_CONFIG.theme.appearanceOptions
+      .find(({ value }) => value === savedTheme?.appearance)?.value;
+    if (themeButton && appearance) {
+      themeButton.setAttribute("aria-label", `Theme: ${appearance}`);
+      themeButton.setAttribute("title", `Theme: ${appearance} (click to change)`);
+    } else if (savedTheme?.appearance) {
+      console.warn("Ignored an invalid saved appearance for the theme control.");
     }
-  } catch { /* Keep the default theme control usable if storage is blocked. */ }
+  } catch (error) {
+    console.error("Could not restore the theme control preference.", error);
+  }
   const shortcutsDialogElement = document.querySelector("#shortcuts-dialog");
   const openShortcuts = () => {
     if (shortcutsDialogElement && !shortcutsDialogElement.open) shortcutsDialogElement.showModal();

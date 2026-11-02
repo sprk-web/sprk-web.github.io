@@ -59,19 +59,22 @@ export async function requireAdmin(app, signInHref = new URL("../account/", impo
     return null;
   }
   const session = data.session;
-  const appDataDb = isAppDataConfigured() && session ? getAppDataSupabaseClient(session) : null;
+  const appDataDb = isAppDataConfigured() ? getAppDataSupabaseClient(session) : null;
   return { db, appDataDb, session, user };
 }
 
-export function renderAdminNavigation(activePage, email) {
+export function renderAdminNavigation(activePage) {
   const prefix = activePage === "overview" ? "./" : "../";
   const links = [
     { key: "overview", label: "Overview", icon: "layout-dashboard", href: prefix },
     { key: "issues", label: "Simulation issues", icon: "shield-alert", href: `${prefix}issues/` },
     { key: "complaints", label: "Complaints", icon: "messages-square", href: `${prefix}complaints/` },
+    { key: "users", label: "Users", icon: "user-round-search", href: `${prefix}users/` },
     { key: "communities", label: "Communities", icon: "users-round", href: `${prefix}communities/` },
+    { key: "gifts", label: "Gift credits", icon: "gift", href: `${prefix}gifts/` },
+    { key: "theme-effects", label: "Theme effects", icon: "sparkles", href: `${prefix}theme-effects/` },
     { key: "updates", label: "Post updates", icon: "megaphone", href: `${prefix}post-updates/` },
     { key: "traffic", label: "Traffic analytics", icon: "chart-no-axes-column-increasing", href: `${prefix}traffic/` },
   ];
-  return `<nav class="admin-subnav" aria-label="Admin sections">${links.map((link) => `<a href="${link.href}" ${link.key === activePage ? 'aria-current="page"' : ""}><i data-lucide="${link.icon}" class="h-4 w-4"></i>${link.label}</a>`).join("")}<span class="admin-nav-account"><i data-lucide="user-round" class="h-4 w-4"></i>${escapeHtml(email)}</span></nav>`;
+  return `<nav class="admin-subnav" aria-label="Admin sections">${links.map((link) => `<a href="${link.href}" ${link.key === activePage ? 'aria-current="page"' : ""}><i data-lucide="${link.icon}" class="h-4 w-4"></i>${link.label}</a>`).join("")}</nav>`;
 }

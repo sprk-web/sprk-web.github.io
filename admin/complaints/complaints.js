@@ -7,7 +7,7 @@ let selectedComplaintId;
 
 function render() {
   app.innerHTML = `<section class="admin-page space-y-6">
-    ${renderAdminNavigation("complaints", context.user.email)}
+    ${renderAdminNavigation("complaints")}
     <h1 class="sr-only">Complaints</h1>
     <div class="admin-page-actions">
       <button id="complaints-refresh" class="admin-refresh" type="button">Refresh inbox</button>

@@ -1,5 +1,6 @@
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from "../js/config.js";
 import { recordContentEngagement } from "../js/analytics.js";
+import { markUpdatesRead } from "../js/update-notifications.js";
 
 const app = document.querySelector("#updates-app");
 const oneDay = 24 * 60 * 60 * 1000;
@@ -27,12 +28,109 @@ function safeMediaUrl(value) {
   }
 }
 
+function renderMarkdownInline(value) {
+  const protectedHtml = [];
+  let html = escapeHtml(value).replace(/`([^`\n]+)`/g, (_, code) => {
+    const token = `\uE000${protectedHtml.length}\uE001`;
+    protectedHtml.push(`<code>${code}</code>`);
+    return token;
+  });
+
+  html = html.replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+|\/[^)\s]*|\.{1,2}\/[^)\s]*|#[^)\s]*)\)/g, (_, label, link) => {
+    const safeUrl = safeMediaUrl(link.replace(/&amp;/g, "&"));
+    if (!safeUrl) return `${label} (${link})`;
+    const token = `\uE000${protectedHtml.length}\uE001`;
+    protectedHtml.push(`<a href="${escapeHtml(safeUrl)}" target="_blank" rel="noopener noreferrer">${label}</a>`);
+    return token;
+  });
+  html = html
+    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+    .replace(/__(.+?)__/g, "<strong>$1</strong>")
+    .replace(/\*(.+?)\*/g, "<em>$1</em>")
+    .replace(/_(.+?)_/g, "<em>$1</em>")
+    .replace(/~~(.+?)~~/g, "<del>$1</del>");
+  return html.replace(/\uE000(\d+)\uE001/g, (_, index) => protectedHtml[Number(index)]);
+}
+
+function renderMarkdown(value) {
+  const lines = String(value).replace(/\r\n?/g, "\n").split("\n");
+  const blocks = [];
+  let paragraph = [];
+  let list = [];
+  let listType = "";
+  let code = null;
+
+  const flushParagraph = () => {
+    if (!paragraph.length) return;
+    blocks.push(`<p>${paragraph.map(renderMarkdownInline).join("<br>")}</p>`);
+    paragraph = [];
+  };
+  const flushList = () => {
+    if (!list.length) return;
+    blocks.push(`<${listType}>${list.map((item) => `<li>${renderMarkdownInline(item)}</li>`).join("")}</${listType}>`);
+    list = [];
+    listType = "";
+  };
+  const flushText = () => {
+    flushParagraph();
+    flushList();
+  };
+
+  for (const line of lines) {
+    const fence = line.match(/^\s*```/);
+    if (fence) {
+      if (code) {
+        blocks.push(`<pre><code>${escapeHtml(code.join("\n"))}</code></pre>`);
+        code = null;
+      } else {
+        flushText();
+        code = [];
+      }
+      continue;
+    }
+    if (code) {
+      code.push(line);
+      continue;
+    }
+    if (!line.trim()) {
+      flushText();
+      continue;
+    }
+
+    const heading = line.match(/^\s{0,3}(#{1,6})\s+(.+?)\s*#*\s*$/);
+    const unorderedItem = line.match(/^\s*[-+*]\s+(.+)$/);
+    const orderedItem = line.match(/^\s*\d+[.)]\s+(.+)$/);
+    const quote = line.match(/^\s*>\s?(.*)$/);
+    if (heading) {
+      flushText();
+      const level = heading[1].length;
+      blocks.push(`<h${level}>${renderMarkdownInline(heading[2])}</h${level}>`);
+    } else if (unorderedItem || orderedItem) {
+      flushParagraph();
+      const nextListType = unorderedItem ? "ul" : "ol";
+      if (listType && listType !== nextListType) flushList();
+      listType = nextListType;
+      list.push((unorderedItem || orderedItem)[1]);
+    } else if (quote) {
+      flushText();
+      blocks.push(`<blockquote><p>${renderMarkdownInline(quote[1])}</p></blockquote>`);
+    } else {
+      flushList();
+      paragraph.push(line);
+    }
+  }
+  if (code) blocks.push(`<pre><code>${escapeHtml(code.join("\n"))}</code></pre>`);
+  flushText();
+  return blocks.join("");
+}
+
 function mediaType(url, name = "") {
   const path = `${new URL(url).pathname} ${name}`.toLowerCase();
   if (/\.(avif|gif|jpe?g|png|svg|webp)(?:\s|$)/.test(path)) return "image";
   if (/\.(mp4|m4v|mov|webm|ogv)(?:\s|$)/.test(path)) return "video";
   if (/\.(mp3|m4a|aac|wav|oga|ogg)(?:\s|$)/.test(path)) return "audio";
   if (/\.pdf(?:\s|$)/.test(path)) return "pdf";
+  if (/\.md(?:own|arkdown)?(?:\s|$)/.test(path)) return "markdown";
   return "file";
 }
 
@@ -95,11 +193,11 @@ function attachmentMarkup(update) {
   if (attachmentUrl) {
     const name = update.attachment_name || "Update attachment";
     const type = mediaType(attachmentUrl, name);
-    const icon = { image: "image", video: "video", audio: "audio-lines", pdf: "file-text", file: "paperclip" }[type];
+    const icon = { image: "image", video: "video", audio: "audio-lines", pdf: "file-text", markdown: "file-text", file: "paperclip" }[type];
     if (type !== "file") {
       items.push(`<button class="update-attachment" type="button" data-media-url="${escapeHtml(attachmentUrl)}" data-media-type="${type}" data-media-title="${escapeHtml(name)}">
         <span class="update-attachment-icon"><i data-lucide="${icon}"></i></span>
-        <span class="update-attachment-copy"><strong>${escapeHtml(name)}</strong><small>${type === "pdf" ? "PDF document · Open preview" : `${type[0].toUpperCase()}${type.slice(1)} media · View attachment`}</small></span>
+        <span class="update-attachment-copy"><strong>${escapeHtml(name)}</strong><small>${type === "pdf" ? "PDF document · Open preview" : type === "markdown" ? "Markdown document · Preview" : `${type[0].toUpperCase()}${type.slice(1)} media · View attachment`}</small></span>
         <i data-lucide="arrow-up-right" class="update-attachment-arrow"></i>
       </button>`);
     } else {
@@ -125,7 +223,7 @@ function renderUpdate(update) {
     <div class="update-card-content">
       <div class="update-card-meta"><span class="update-category update-category-${category}"><i data-lucide="${icon}"></i> ${label}</span>${recent ? '<span class="update-recent-tag"><span></span> Recent</span>' : ""}<time datetime="${escapeHtml(update.created_at || "")}">${escapeHtml(formatDate(update.created_at))}</time></div>
       <h3>${escapeHtml(update.title || "Update")}</h3>
-      ${update.body ? `<p class="update-body">${escapeHtml(update.body)}</p>` : ""}
+      ${update.body ? `<div class="update-body markdown-body">${renderMarkdown(update.body)}</div>` : ""}
       ${attachmentMarkup(update)}
       <a class="update-share-link" href="${escapeHtml(updatePermalink(String(update.id)))}"><i data-lucide="link"></i> Permalink</a>
     </div>
@@ -220,6 +318,7 @@ function renderUpdates(updates) {
 
   const dialog = app.querySelector(".updates-media-dialog");
   const stage = dialog.querySelector(".updates-media-stage");
+  let mediaRequest = 0;
   app.addEventListener("click", (event) => {
     const contentAction = event.target.closest(".update-card a, .update-card button[data-media-url]");
     if (contentAction) {
@@ -235,6 +334,7 @@ function renderUpdates(updates) {
     }
     const type = trigger.dataset.mediaType;
     const title = trigger.dataset.mediaTitle || "Update attachment";
+    const request = ++mediaRequest;
     app.querySelector("#updates-media-title").textContent = title;
     if (type === "image") {
       stage.innerHTML = `<img src="${escapeHtml(url)}" alt="${escapeHtml(title)}">`;
@@ -242,6 +342,24 @@ function renderUpdates(updates) {
       stage.innerHTML = `<video src="${escapeHtml(url)}" controls autoplay playsinline aria-label="${escapeHtml(title)}"></video>`;
     } else if (type === "audio") {
       stage.innerHTML = `<div class="updates-audio-preview"><i data-lucide="audio-lines"></i><strong>${escapeHtml(title)}</strong><audio src="${escapeHtml(url)}" controls></audio></div>`;
+    } else if (type === "markdown") {
+      stage.innerHTML = '<p class="updates-markdown-loading">Loading Markdown…</p>';
+      dialog.showModal();
+      fetch(url)
+        .then((response) => {
+          if (!response.ok) throw new Error(`Markdown request failed with status ${response.status}.`);
+          return response.text();
+        })
+        .then((markdown) => {
+          if (request !== mediaRequest || !dialog.open) return;
+          stage.innerHTML = `<article class="markdown-body updates-markdown-preview">${renderMarkdown(markdown)}</article>`;
+        })
+        .catch((error) => {
+          console.error("Could not load the Markdown attachment.", error);
+          if (request !== mediaRequest || !dialog.open) return;
+          stage.innerHTML = '<p class="updates-markdown-error" role="alert">Could not load this Markdown file. Check the file URL and access permissions.</p>';
+        });
+      return;
     } else {
       stage.innerHTML = `<iframe src="${escapeHtml(url)}" title="${escapeHtml(title)}" sandbox="allow-scripts allow-forms"></iframe>`;
     }
@@ -251,13 +369,17 @@ function renderUpdates(updates) {
 
   const closeDialog = () => {
     dialog.close();
+    mediaRequest += 1;
     stage.replaceChildren();
   };
   dialog.querySelector(".updates-media-close").addEventListener("click", closeDialog);
   dialog.addEventListener("click", (event) => {
     if (event.target === dialog) closeDialog();
   });
-  dialog.addEventListener("close", () => stage.replaceChildren());
+  dialog.addEventListener("close", () => {
+    mediaRequest += 1;
+    stage.replaceChildren();
+  });
   window.lucide?.createIcons();
   applyFilters();
 }
@@ -284,6 +406,7 @@ async function loadFirstPage(sort = activeSort) {
   if (error) throw error;
 
   const firstPage = data || [];
+  if (firstPage.length) markUpdatesRead(firstPage[0].created_at);
   const hasNextPage = firstPage.length === pageSize;
 
   if (linkedUpdateId && !firstPage.some((update) => String(update.id) === linkedUpdateId)) {

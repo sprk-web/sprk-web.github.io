@@ -30,7 +30,7 @@ function render() {
   const visible = updates;
   app.innerHTML = `<section class="admin-page space-y-6">
     <h1 class="sr-only">Post updates</h1>
-    ${renderAdminNavigation("updates", context.user.email)}
+    ${renderAdminNavigation("updates")}
     <div class="admin-page-actions">
       <a class="admin-refresh" href="../../updates/"><i data-lucide="external-link" class="h-4 w-4"></i>View public updates</a>
     </div>
@@ -40,7 +40,7 @@ function render() {
         <input name="id" type="hidden">
         <label class="grid gap-1 text-sm font-medium">Title<input name="title" class="theme-control px-3 py-2" maxlength="160" required></label>
         <label class="grid gap-1 text-sm font-medium">Category<select name="category" class="theme-control px-3 py-2"><option value="announcement">Announcement</option><option value="release">Release</option><option value="improvement">Improvement</option></select></label>
-        <label class="grid gap-1 text-sm font-medium">Message<textarea name="body" class="theme-control px-3 py-2" rows="6" maxlength="10000" placeholder="Write an announcement for your visitors."></textarea></label>
+        <label class="grid gap-1 text-sm font-medium">Message<textarea name="body" class="theme-control px-3 py-2" rows="6" maxlength="10000" placeholder="Write an announcement for your visitors."></textarea><span class="text-xs text-[#777]">Markdown formatting is supported.</span></label>
         <label class="grid gap-1 text-sm font-medium">Image URL<input name="image_url" type="url" class="theme-control px-3 py-2" placeholder="https://…"></label>
         <div class="admin-upload-field">
           <span class="admin-upload-title">Upload image</span>
@@ -63,7 +63,7 @@ function render() {
             <span class="admin-upload-action">Browse</span>
           </label>
           <span class="admin-upload-selected" role="status">No file selected</span>
-          <span class="admin-upload-hint">Any file type is supported.</span>
+          <span class="admin-upload-hint">Any file type is supported. Markdown (.md) files can be previewed on the updates page.</span>
         </div>
         <label class="grid gap-1 text-sm font-medium">Attachment display name<input name="attachment_name" class="theme-control px-3 py-2" maxlength="180" placeholder="Download notes.pdf"></label>
         <label class="flex items-center gap-2 text-sm"><input name="published" type="checkbox" checked> Publish immediately</label>

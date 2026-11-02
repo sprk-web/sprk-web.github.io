@@ -3,6 +3,7 @@ export const SITE_CONFIG = {
   pageTitles: {
     home: "SPRK-Web",
     simulations: "Simulations - SPRK-Web",
+    resources: "Resource Library - SPRK-Web",
     account: "Your account - SPRK-Web",
     updates: "Updates - SPRK-Web",
     support: "Contact support - SPRK-Web",
@@ -16,8 +17,9 @@ export const SITE_CONFIG = {
   },
   navigation: [
     { key: "home", label: "Home", icon: "house", path: "./" },
+//    { key: "updates", label: "Updates", icon: "bell", path: "updates/" },
     { key: "simulations", label: "Simulations", icon: "atom", path: "simulator/" },
-    { key: "updates", label: "Updates", icon: "bell", path: "updates/" },
+    { key: "resources", label: "Resource Library", icon: "library", path: "resources/" },
     { key: "syllabus_tracker", label: "Syllabus Tracker", icon: "book-check", path: "syllabus_tracker/" },
     { key: "question_log", label: "Error Log", icon: "notebook-pen", path: "error_log/" },
     { key: "quests", label: "Daily Goals", icon: "list-todo", path: "quests/" },
@@ -26,6 +28,7 @@ export const SITE_CONFIG = {
   searchPages: [
     { label: "Home", title: "SPRK-Web", path: "./", terms: ["start", "homepage", "learning", "explore"] },
     { label: "Simulations", title: "Explore simulations", path: "simulator/", terms: ["simulator", "physics", "experiments", "learning lab"] },
+    { label: "Resource Library", title: "Free study resources", path: "resources/", terms: ["resources", "free resources", "jee", "videos", "notes", "courses"] },
     { label: "Updates", title: "What’s new", path: "updates/", terms: ["news", "announcements", "releases", "posts"] },
     { label: "Community", title: "Public study forums", path: "community/", terms: ["study forum", "groups", "discussion", "questions", "communities"] },
     { label: "Syllabus Tracker", title: "JEE syllabus progress", path: "syllabus_tracker/", terms: ["jee", "jee mains", "jee advanced", "syllabus", "checkpoints", "revision", "prep", "ascent"] },
@@ -41,7 +44,7 @@ export const SITE_CONFIG = {
   ],
   sidebar: {
     primarySectionTitle: "Discover",
-    personalSectionTitle: "Your space",
+    personalSectionTitle: "You",
     personalLinks: [
       { key: "account", label: "Your account", icon: "user-round", path: "account/" },
       { key: "support", label: "Contact support", icon: "shield-user", path: "support/" },
@@ -120,7 +123,19 @@ export const SITE_CONFIG = {
       { value: "cool", label: "Cool" },
     ],
     fontSize: { min: 14, max: 20, step: 1 },
+    accentOptions: [
+      { value: "#2563eb", label: "Blue" },
+      { value: "#7c3aed", label: "Violet" },
+      { value: "#0f766e", label: "Teal" },
+      { value: "#db2777", label: "Pink" },
+      { value: "#ea580c", label: "Orange" },
+      { value: "#4d7c0f", label: "Green" },
+    ],
   },
+};
+
+export const CONTRIBUTION_CONFIG = {
+  currencyName: "Study Credits",
 };
 
 export const SIMULATOR_CONFIG = {

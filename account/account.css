@@ -23,6 +23,44 @@ html {
   box-shadow: var(--app-shadow);
 }
 
+.account-wallet-card {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin: 20px clamp(18px, 3vw, 32px) 0;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface-soft);
+}
+
+.account-wallet-card > div {
+  display: grid;
+  gap: 4px;
+}
+
+.account-wallet-card strong {
+  font-size: 1.5rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.account-wallet-card > div > span:last-child,
+.account-wallet-label,
+.account-wallet-card p {
+  color: var(--muted);
+  font-size: .82rem;
+}
+
+.account-wallet-label {
+  color: var(--app-accent);
+  font-weight: 700;
+}
+
+.account-wallet-card p {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
 .account-preset-fieldset {
   display: grid;
   gap: 10px;
@@ -792,5 +830,410 @@ html {
   #account-app *::after {
     scroll-behavior: auto !important;
     transition-duration: .01ms !important;
+  }
+}
+
+#account-app {
+  max-width: 1320px;
+  margin: 0 auto;
+  padding: clamp(24px, 4vw, 48px) clamp(18px, 4vw, 54px) 72px;
+}
+
+.account-dashboard {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-auto-flow: row;
+  gap: 24px;
+  overflow: visible;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.account-dashboard > * {
+  min-width: 0;
+  grid-column: 1;
+}
+
+.account-dashboard .account-profile-header {
+  min-height: 190px;
+  align-items: flex-end;
+  padding: clamp(26px, 5vw, 48px);
+  border: 1px solid color-mix(in srgb, var(--app-accent) 15%, var(--line));
+  border-radius: 26px;
+  background:
+    radial-gradient(ellipse at 86% 12%, rgb(255 255 255 / 54%), transparent 35%),
+    radial-gradient(ellipse at 4% 110%, color-mix(in srgb, var(--app-accent) 13%, transparent), transparent 44%),
+    linear-gradient(125deg, color-mix(in srgb, var(--app-accent) 10%, var(--surface)), var(--surface));
+  box-shadow: var(--app-shadow);
+}
+
+.account-header-copy {
+  display: grid;
+  gap: 14px;
+}
+
+.account-header-eyebrow {
+  color: var(--app-accent);
+  font-size: .7rem;
+  font-weight: 800;
+  letter-spacing: .13em;
+}
+
+.account-dashboard .account-identity {
+  gap: 20px;
+}
+
+.account-dashboard .account-avatar {
+  width: 88px;
+  height: 88px;
+  border: 4px solid var(--surface);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--app-accent) 25%, transparent), 0 10px 24px rgb(22 27 38 / 12%);
+}
+
+.account-dashboard .account-identity h2 {
+  font-size: clamp(1.55rem, 3vw, 2rem);
+  letter-spacing: -.035em;
+}
+
+.account-dashboard .account-identity p {
+  margin-top: 7px;
+}
+
+.account-dashboard > .account-profile-header > .account-field-hint {
+  align-self: flex-end;
+  padding: 8px 12px;
+  border: 1px solid color-mix(in srgb, var(--line) 75%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface) 72%, transparent);
+}
+
+.account-dashboard .account-wallet-card {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.account-wallet-stat {
+  position: relative;
+  display: grid;
+  min-height: 180px;
+  align-content: center;
+  justify-items: start;
+  gap: 5px;
+  overflow: hidden;
+  padding: 24px 28px;
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  background: var(--surface);
+  box-shadow: var(--app-shadow);
+}
+
+.account-currency-stat {
+  background:
+    radial-gradient(ellipse at 100% 0%, color-mix(in srgb, #f3b84b 17%, transparent), transparent 48%),
+    var(--surface);
+}
+
+.account-xp-stat {
+  background:
+    radial-gradient(ellipse at 100% 0%, color-mix(in srgb, var(--app-accent) 12%, transparent), transparent 48%),
+    var(--surface);
+}
+
+.account-wallet-icon {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  margin-bottom: 5px;
+  border-radius: 13px;
+  background: color-mix(in srgb, var(--app-accent) 10%, var(--surface));
+  color: var(--app-accent);
+}
+
+.account-currency-stat .account-wallet-icon {
+  background: color-mix(in srgb, #e6a327 14%, var(--surface));
+  color: #a86200;
+}
+
+.account-wallet-stat .account-wallet-label {
+  color: var(--muted);
+  font-size: .68rem;
+  font-weight: 800;
+  letter-spacing: .1em;
+}
+
+.account-wallet-stat strong {
+  font-size: clamp(2rem, 4vw, 2.65rem);
+  line-height: 1.15;
+  letter-spacing: -.04em;
+}
+
+.account-wallet-stat > span:last-child {
+  color: var(--muted);
+  font-size: .82rem;
+}
+
+.account-wallet-note {
+  display: flex;
+  grid-column: 1 / -1;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 9px;
+  padding: 14px 18px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--surface-soft) 75%, var(--surface));
+  color: var(--muted);
+  font-size: .82rem;
+}
+
+.account-wallet-note i {
+  color: var(--app-accent);
+}
+
+.account-wallet-note a {
+  margin-left: auto;
+  color: var(--app-accent);
+  font-weight: 750;
+  text-decoration: none;
+}
+
+.account-wallet-note a:hover {
+  text-decoration: underline;
+}
+
+.account-redeem-card,
+.account-gift-admin {
+  display: grid;
+  gap: 18px;
+  padding: clamp(20px, 3vw, 28px);
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  background: var(--surface);
+  box-shadow: var(--app-shadow);
+}
+
+.account-gift-admin {
+  background:
+    radial-gradient(ellipse at 100% 0%, color-mix(in srgb, var(--app-accent) 7%, transparent), transparent 48%),
+    var(--surface);
+}
+
+.account-redeem-heading {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+}
+
+.account-redeem-heading .account-icon-tile {
+  width: 44px;
+  height: 44px;
+  flex: 0 0 auto;
+}
+
+.account-redeem-heading h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.account-redeem-heading p {
+  margin: 5px 0 0;
+  color: var(--muted);
+  font-size: .82rem;
+  line-height: 1.5;
+}
+
+.account-gift-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(170px, auto);
+  align-items: end;
+  gap: 13px;
+}
+
+.account-gift-form .account-primary-button {
+  white-space: nowrap;
+}
+
+.account-gift-form .account-status {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
+.account-gift-result {
+  display: grid;
+  gap: 7px;
+  padding: 14px;
+  border: 1px solid color-mix(in srgb, #16804a 22%, var(--line));
+  border-radius: 13px;
+  background: color-mix(in srgb, #16804a 6%, var(--surface));
+  color: var(--ink);
+  font-size: .84rem;
+}
+
+.account-gift-result[data-kind="error"] {
+  border-color: color-mix(in srgb, #c62828 25%, var(--line));
+  color: #b42318;
+}
+
+.account-gift-result p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.account-gift-link-row {
+  display: flex;
+  gap: 8px;
+}
+
+.account-gift-link-row input {
+  min-width: 0;
+  flex: 1;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: .78rem;
+}
+
+.account-gift-link-row .account-secondary-button {
+  min-height: 38px;
+  padding: 0 11px;
+  white-space: nowrap;
+}
+
+.account-dashboard .account-profile-body {
+  grid-template-columns: minmax(0, 1.6fr) minmax(250px, .7fr);
+  gap: 18px;
+}
+
+.account-dashboard .account-profile-main,
+.account-dashboard .account-profile-sidebar,
+.account-dashboard .account-security-card {
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  background: var(--surface);
+  box-shadow: var(--app-shadow);
+}
+
+.account-dashboard .account-profile-main {
+  gap: 26px;
+  padding: clamp(22px, 3vw, 34px);
+}
+
+.account-dashboard .account-upload {
+  display: grid;
+}
+
+.account-section-heading {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.account-section-heading .account-icon-tile {
+  width: 44px;
+  height: 44px;
+  flex: 0 0 auto;
+}
+
+.account-dashboard .account-profile-sidebar {
+  align-content: center;
+  gap: 22px;
+  padding: clamp(22px, 3vw, 30px);
+  border-top: 1px solid var(--line);
+  border-left: 1px solid var(--line);
+  background:
+    radial-gradient(ellipse at 100% 0%, color-mix(in srgb, var(--app-accent) 7%, transparent), transparent 50%),
+    var(--surface-soft);
+}
+
+.account-dashboard .account-security-card {
+  padding: clamp(22px, 3vw, 32px);
+}
+
+.account-dashboard .account-security-heading {
+  align-items: center;
+}
+
+#account-app .account-dashboard #status {
+  grid-column: 1;
+  margin: -8px 0 0;
+  padding: 0 4px;
+}
+
+.account-dashboard .account-security-actions {
+  justify-items: end;
+}
+
+@media (max-width: 760px) {
+  .account-dashboard .account-profile-body {
+    grid-template-columns: 1fr;
+  }
+
+  .account-dashboard .account-profile-sidebar {
+    border-left: 1px solid var(--line);
+  }
+}
+
+@media (max-width: 520px) {
+  #account-app {
+    padding-right: 14px;
+    padding-left: 14px;
+  }
+
+  .account-dashboard {
+    gap: 16px;
+  }
+
+  .account-dashboard .account-profile-header {
+    min-height: 0;
+    padding: 22px 18px;
+  }
+
+  .account-dashboard > .account-profile-header > .account-field-hint {
+    align-self: flex-start;
+  }
+
+  .account-dashboard .account-avatar {
+    width: 68px;
+    height: 68px;
+  }
+
+  .account-dashboard .account-wallet-card {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .account-wallet-stat {
+    min-height: 156px;
+    padding: 18px 15px;
+  }
+
+  .account-wallet-note {
+    align-items: flex-start;
+  }
+
+  .account-wallet-note a {
+    width: 100%;
+    margin-left: 25px;
+  }
+
+  .account-gift-form {
+    grid-template-columns: 1fr;
+  }
+
+  .account-gift-form .account-primary-button {
+    justify-self: start;
+  }
+
+  .account-gift-link-row {
+    align-items: stretch;
+    flex-direction: column;
   }
 }

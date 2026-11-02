@@ -1,5 +1,6 @@
 import { getPrimarySupabaseClient } from "../js/supabaseClient.js";
 import { getAppDataSupabaseClient, isAppDataConfigured } from "../js/appDataSupabaseClient.js";
+import { applyThemeEffectStyles, loadLeaderboardEffects, loadThemeEffects } from "../js/theme-effects.js";
 import { confirmDialog, promptDialog } from "../js/dialogs.js";
 
 const app = document.querySelector("#quests-app");
@@ -260,6 +261,23 @@ async function renderLeaderboard() {
     }
   }
   const username = mainProfile.display_name?.trim() || user.user_metadata?.display_name || user.email?.split("@")[0] || profile.handle;
+  const [nameEffects, publishedEffects] = await Promise.all([
+    loadLeaderboardEffects(db, entries.map(({ user_id }) => user_id)),
+    loadThemeEffects(db),
+  ]);
+  const { data: premiumStatus, error: premiumStatusError } = await mainDb.rpc("get_sprk_premium_status", {
+    p_user_ids: entries.map(({ user_id }) => user_id),
+  });
+  if (premiumStatusError) throw premiumStatusError;
+  const premiumUserIds = new Set((premiumStatus || [])
+    .filter(({ is_premium }) => is_premium)
+    .map(({ user_id }) => user_id));
+  const effectsById = new Map(publishedEffects.map((effect) => [effect.id, effect]));
+  const activeEffectIds = new Set([...nameEffects]
+    .filter(([userId, effectId]) => effectsById.has(effectId)
+      && (!effectsById.get(effectId).premium_only || premiumUserIds.has(userId)))
+    .map(([, effectId]) => effectId));
+  applyThemeEffectStyles([...activeEffectIds].map((effectId) => effectsById.get(effectId)));
   return `<section class="theme-card tracker-leaderboard">
     <div class="tracker-panel-heading"><div><h2>Leaderboard</h2></div>
       <select id="leaderboard-period" aria-label="Leaderboard period"><option value="weekly" ${leaderboardPeriod === "weekly" ? "selected" : ""}>This week</option><option value="all_time" ${leaderboardPeriod === "all_time" ? "selected" : ""}>All time</option></select>
@@ -270,7 +288,7 @@ async function renderLeaderboard() {
       ? `<img src="${escapeHtml(entry.avatar_url)}" alt="">`
       : `<span aria-hidden="true">${escapeHtml(displayName.trim().slice(0, 1).toUpperCase() || "L")}</span>`;
     return `<li class="${entry.is_self ? "is-self" : ""}">
-      <span class="tracker-rank">${Number(entry.leaderboard_rank)}</span><span class="tracker-leader-avatar">${picture}</span><span class="tracker-leader-name">${escapeHtml(displayName)}${entry.is_self ? " · You" : ""}</span><strong>${Number(entry.xp).toLocaleString()} XP</strong>
+      <span class="tracker-rank">${Number(entry.leaderboard_rank)}</span><span class="tracker-leader-avatar">${picture}</span><span class="tracker-leader-name leaderboard-name"${activeEffectIds.has(nameEffects.get(entry.user_id)) ? ` data-theme-effect="${escapeHtml(nameEffects.get(entry.user_id))}"` : ""}>${escapeHtml(displayName)}${entry.is_self ? " · You" : ""}</span><strong>${Number(entry.xp).toLocaleString()} XP</strong>
     </li>`;
   }).join("")}</ol>` : `<div class="tracker-leaderboard-empty"><span class="tracker-leaderboard-empty-icon"><i data-lucide="trophy"></i></span><strong>No rankings yet</strong><span>Complete a study goal to earn XP and join the leaderboard.</span></div>`}
   </section>`;

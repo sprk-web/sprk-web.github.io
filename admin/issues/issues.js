@@ -32,7 +32,7 @@ function renderIssues(issues, reportsBySimulation) {
   });
   app.innerHTML = `<section class="admin-page space-y-6">
     <h1 class="sr-only">Simulation issues</h1>
-    ${renderAdminNavigation("issues", context.user.email)}
+    ${renderAdminNavigation("issues")}
     <div class="admin-page-actions">
       <button id="issues-refresh" class="admin-refresh" type="button"><i data-lucide="refresh-cw" class="h-4 w-4"></i>Refresh</button>
     </div>

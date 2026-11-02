@@ -1,4 +1,4 @@
-import { SIMULATOR_CONFIG, SUPABASE_ANON_KEY, SUPABASE_URL } from "../js/config.js";
+import { CONTRIBUTION_CONFIG, SIMULATOR_CONFIG, SUPABASE_ANON_KEY, SUPABASE_URL } from "../js/config.js";
 import { getAppDataSupabaseClient, isAppDataConfigured } from "../js/appDataSupabaseClient.js";
 import { getPrimarySupabaseClient } from "../js/supabaseClient.js";
 import { confirmDialog } from "../js/dialogs.js";
@@ -780,7 +780,15 @@ async function publishSimulation(event) {
       code_size_bytes: new Blob([html]).size,
     }).select("id").single();
     if (error) throw error;
-    result.innerHTML = `Published successfully. <a href="#/view/${encodeURIComponent(created.id)}">Open your simulation</a>`;
+    const { data: reward, error: rewardError } = await supabase.from("contribution_reward_settings")
+      .select("currency_amount,xp_amount")
+      .eq("task_key", "simulation")
+      .maybeSingle();
+    if (rewardError) console.error("Could not load the simulation contribution reward.", rewardError);
+    const rewardMessage = reward
+      ? ` You earned ${Number(reward.currency_amount)} ${escapeHtml(CONTRIBUTION_CONFIG.currencyName)} and ${Number(reward.xp_amount)} XP.`
+      : " Reward status could not be verified. Check your account and confirm the contribution schema is installed.";
+    result.innerHTML = `Published successfully.${rewardMessage} <a href="#/view/${encodeURIComponent(created.id)}">Open your simulation</a>`;
     result.className = "simulator-notice success";
     result.hidden = false;
     form.reset();

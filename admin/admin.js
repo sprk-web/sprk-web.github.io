@@ -6,7 +6,7 @@ function renderOverview({ user, updates, publishedCount, views, recentViews, int
   const recentDrafts = updates.filter((item) => !item.published).length;
   app.innerHTML = `<section class="admin-page space-y-6">
     <h1 class="sr-only">Admin overview</h1>
-    ${renderAdminNavigation("overview", user.email)}
+    ${renderAdminNavigation("overview")}
     <div class="admin-page-actions">
       <button id="admin-refresh" class="admin-refresh" type="button"><i data-lucide="refresh-cw" class="h-4 w-4"></i>Refresh overview</button>
     </div>
@@ -17,8 +17,11 @@ function renderOverview({ user, updates, publishedCount, views, recentViews, int
       <article class="admin-metric-card"><span class="admin-metric-icon"><i data-lucide="mouse-pointer-click" class="h-5 w-5"></i></span><p>Update interactions</p><strong>${Number(interactions).toLocaleString()}</strong><span>${Number(recentInteractions).toLocaleString()} in the last 7 days</span></article>
     </div>
     <div class="admin-tool-grid">
+      <a class="theme-card admin-tool-card" href="./users/"><span class="admin-tool-icon"><i data-lucide="user-round-search" class="h-5 w-5"></i></span><span class="admin-tool-copy"><strong>Manage users</strong><small>Review user profiles and manage account bans.</small></span><i data-lucide="arrow-up-right" class="admin-tool-arrow h-5 w-5"></i></a>
       <a class="theme-card admin-tool-card" href="./communities/"><span class="admin-tool-icon"><i data-lucide="users-round" class="h-5 w-5"></i></span><span class="admin-tool-copy"><strong>Manage communities</strong><small>Create and edit public study communities, or remove communities and their discussions.</small></span><i data-lucide="arrow-up-right" class="admin-tool-arrow h-5 w-5"></i></a>
-      <a class="theme-card admin-tool-card" href="./post-updates/"><span class="admin-tool-icon"><i data-lucide="megaphone" class="h-5 w-5"></i></span><span class="admin-tool-copy"><strong>Post updates</strong><small>Write announcements, save drafts, manage attachments, and edit or unpublish existing posts.</small></span><i data-lucide="arrow-up-right" class="admin-tool-arrow h-5 w-5"></i></a>
+      <a class="theme-card admin-tool-card" href="./gifts/"><span class="admin-tool-icon"><i data-lucide="gift" class="h-5 w-5"></i></span><span class="admin-tool-copy"><strong>Gift credits</strong><small>Create custom codes or shareable links, review redemption limits, and revoke gifts.</small></span><i data-lucide="arrow-up-right" class="admin-tool-arrow h-5 w-5"></i></a>
+      <a class="theme-card admin-tool-card" href="./theme-effects/"><span class="admin-tool-icon"><i data-lucide="sparkles" class="h-5 w-5"></i></span><span class="admin-tool-copy"><strong>Theme effects</strong><small>Publish leaderboard name effects and manage the effect catalog.</small></span><i data-lucide="arrow-up-right" class="admin-tool-arrow h-5 w-5"></i></a>
+      <a class="theme-card admin-tool-card" href="./post-updates/"><span class="admin-tool-icon"><i data-lucide="megaphone" class="h-5 w-5"></i></span><span class="admin-tool-copy"><strong>Post updates</strong><small>Write announcements, save drafts, manage attachments, and edit or unpublish existing posts.</small></span><i data-lucide="arrow-up-right" class="h-5 w-5"></i></a>
       <a class="theme-card admin-tool-card" href="./traffic/"><span class="admin-tool-icon"><i data-lucide="chart-no-axes-column-increasing" class="h-5 w-5"></i></span><span class="admin-tool-copy"><strong>Traffic analytics</strong><small>Compare date ranges, find popular pages, and see which updates visitors engage with.</small></span><i data-lucide="arrow-up-right" class="admin-tool-arrow h-5 w-5"></i></a>
     </div>
     <section class="theme-card admin-panel admin-table-panel">

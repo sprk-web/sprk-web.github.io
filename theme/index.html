@@ -7,6 +7,7 @@
   <title>Theme &amp; personalization - SPRK WEB</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/lucide@latest"></script>  
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <link rel="stylesheet" href="../theme.css">
 </head>
 <body data-page="theme" class="m-0 min-h-screen min-w-[320px] bg-white font-sans text-[#0f0f0f]">
@@ -74,7 +75,7 @@
           </span>
           <div>
             <h2 id="color-heading" class="m-0 text-lg font-semibold">Accent color</h2>
-            <p class="m-0 mt-1 text-sm text-[#606060]">Pick a color for highlights and selected navigation.</p>
+            <p class="m-0 mt-1 text-sm text-[#606060]">Choose a preset color, or unlock the full color picker with Premium.</p>
           </div>
         </div>
         <label class="flex w-fit cursor-pointer items-center gap-3 text-sm font-medium" for="accent">
@@ -98,7 +99,7 @@
           </span>
           <div>
             <h2 id="typography-heading" class="m-0 text-lg font-semibold">Typography</h2>
-            <p class="m-0 mt-1 text-sm text-[#606060]">Adjust the typeface and overall reading size.</p>
+            <p class="m-0 mt-1 text-sm text-[#606060]">Premium includes every font. Study Credits unlock name effects for leaderboards.</p>
           </div>
         </div>
         <div class="grid gap-5 sm:grid-cols-2">
@@ -118,6 +119,18 @@
             <input id="font-size" class="w-full accent-[var(--app-accent)]" type="range" min="14" max="20" step="1" value="16" data-setting="fontSize">
             <div class="mt-1 flex justify-between text-xs text-[#606060]"><span>Small</span><span>Large</span></div>
           </div>
+        </div>
+        <div id="theme-effects-panel" class="theme-effects-panel" aria-live="polite">
+          <div class="theme-effects-heading">
+            <h3>Name effects</h3>
+            <p>Spend Study Credits on effects for your name across leaderboards. Earn credits by publishing helpful simulations and study resources. Effects are saved to your account.</p>
+          </div>
+          <label class="theme-effect-select-label" for="leaderboard-name-effect">Your leaderboard name effect</label>
+          <select id="leaderboard-name-effect" class="theme-control w-full max-w-md px-3 py-2.5 text-sm" disabled>
+            <option value="">Loading name effects…</option>
+          </select>
+          <div id="theme-effect-list" class="theme-effect-list"></div>
+          <output id="theme-effect-status" class="theme-save-status" role="status" aria-live="polite"></output>
         </div>
       </section>
 
@@ -185,16 +198,5 @@
 
   <script type="module" src="../js/shell.js"></script>
   <script type="module" src="../js/theme.js"></script>
-  <script>
-    const fontSize = document.querySelector("#font-size");
-    const fontSizeValue = document.querySelector("#font-size-value");
-    fontSize.addEventListener("input", () => {
-      fontSizeValue.value = `${fontSize.value} px`;
-    });
-    fontSize.addEventListener("change", () => {
-      fontSizeValue.value = `${fontSize.value} px`;
-    });
-    fontSizeValue.value = `${fontSize.value} px`;
-  </script>
 <script type="module" src="../js/analytics.js"></script></body>
 </html>

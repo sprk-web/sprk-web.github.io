@@ -28,10 +28,10 @@ function rangeBounds(range) {
   };
 }
 
-function renderPage(email) {
+function renderPage() {
   app.innerHTML = `<section class="admin-page space-y-6">
     <h1 class="sr-only">Traffic analytics</h1>
-    ${renderAdminNavigation("traffic", email)}
+    ${renderAdminNavigation("traffic")}
     <div class="admin-page-actions">
       <div class="admin-header-actions"><button id="traffic-refresh" class="admin-refresh" type="button"><i data-lucide="refresh-cw" class="h-4 w-4"></i>Refresh</button><button id="traffic-export" class="admin-refresh" type="button"><i data-lucide="download" class="h-4 w-4"></i>Export CSV</button></div>
     </div>
@@ -326,7 +326,7 @@ async function start() {
     return;
   }
   state.allTimeCount = count || 0;
-  renderPage(context.user.email);
+  renderPage();
   await loadEvents();
 }
 

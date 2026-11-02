@@ -11,7 +11,7 @@ let selectedPresetIcon = null;
 function render() {
   app.innerHTML = `<section class="admin-page space-y-6">
     <h1 class="sr-only">Manage communities</h1>
-    ${renderAdminNavigation("communities", context.user.email)}
+    ${renderAdminNavigation("communities")}
     <div class="admin-page-actions"><button id="communities-refresh" class="admin-refresh" type="button"><i data-lucide="refresh-cw" class="h-4 w-4"></i>Refresh</button></div>
     <div id="communities-feedback" class="admin-form-status" role="status" aria-live="polite" hidden></div>
     <div class="admin-update-layout">
@@ -22,7 +22,7 @@ function render() {
         <label class="grid gap-1 text-sm font-medium">Description<textarea name="description" class="theme-control px-3 py-2" rows="4" maxlength="2000"></textarea></label>
         <label class="grid gap-1 text-sm font-medium">Community profile picture<input name="icon_file" class="theme-control px-3 py-2" type="file" accept="image/png,image/jpeg,image/webp,image/gif"><span class="text-xs text-[#777]">PNG, JPEG, WebP, or GIF; maximum 5 MB. Uploading a picture replaces the current icon URL.</span></label>
         <div id="community-icon-preview" class="flex items-center gap-3" aria-live="polite"></div>
-        <fieldset class="community-preset-fieldset"><legend>Or choose a default picture</legend><div class="image-preset-grid">${PRESET_PROFILE_IMAGES.map(({ label, url }) => `<button class="image-preset-option" type="button" data-preset-icon="${escapeHtml(url)}" aria-label="${label}" aria-pressed="${selectedPresetIcon === url}"><img src="${escapeHtml(url)}" alt=""><span>${label}</span></button>`).join("")}</div></fieldset>
+        <fieldset class="community-preset-fieldset"><legend>Or choose a default picture</legend><div class="image-preset-grid">${PRESET_PROFILE_IMAGES.map(({ label, url, legacyUrl }) => `<button class="image-preset-option" type="button" data-preset-icon="${escapeHtml(url)}" aria-label="${label}" aria-pressed="${selectedPresetIcon === url || selectedPresetIcon === legacyUrl}"><img src="${escapeHtml(url)}" alt="" loading="lazy" decoding="async" width="52" height="52"><span>${label}</span></button>`).join("")}</div></fieldset>
         <label class="grid gap-1 text-sm font-medium">Or use an image URL<input name="icon_url" class="theme-control px-3 py-2" type="url" maxlength="2048" placeholder="https://…"></label>
         <div class="flex flex-wrap gap-2"><button class="accent-button rounded-lg px-4 py-2 font-semibold" type="submit">Create community</button><button id="community-cancel-edit" class="admin-secondary-button" type="button" hidden>Cancel editing</button></div>
         <p class="text-xs text-[#777]">Members can join and reply to study topics. Only site administrators can create, edit, or delete communities.</p>
@@ -262,7 +262,7 @@ async function handleRowAction(event) {
     form.elements.description.value = community.description || "";
     form.elements.icon_url.value = community.icon_url || "";
     form.elements.icon_file.value = "";
-    selectedPresetIcon = PRESET_PROFILE_IMAGES.find(({ url }) => url === community.icon_url)?.url || null;
+    selectedPresetIcon = PRESET_PROFILE_IMAGES.find(({ url, legacyUrl }) => url === community.icon_url || legacyUrl === community.icon_url)?.url || null;
     updatePresetIconSelection();
     renderIconPreview(community.icon_url, "Current picture");
     app.querySelector("#community-form-title").textContent = "Edit community";
